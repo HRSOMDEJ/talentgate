@@ -12,7 +12,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230b1b36'/%3E%3Cpath d='M17 50V28a15 15 0 0 1 30 0v22' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round'/%3E%3Cpath d='M24 41l8-9 8 9' fill='none' stroke='%23e0243f' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@400;500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=2569-10-03.1">
+<link rel="preload" as="image" href="bg.jpg?v=1">
+<link rel="stylesheet" href="style.css?v=2569-10-04.1">
 </head>
 <body>
 <header class="topbar" id="topbar">
@@ -29,13 +30,14 @@
   <span class="foot-ver" id="footVer"></span>
 </footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<div id="netpill" class="netpill" hidden>กำลังรอเซิร์ฟเวอร์…</div>
+<div id="netbar" class="netbar" aria-hidden="true"><i></i></div>
+<div id="waitbox" class="waitbox" role="alertdialog" aria-live="assertive" hidden><div class="wait-card"><div class="wait-ring"><i></i><i></i><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M17 50V28a15 15 0 0 1 30 0v22" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M24 41l8-9 8 9" fill="none" stroke="#e0243f" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><b id="waitT">กำลังดำเนินการ…</b><span id="waitS">ระบบกำลังทำงาน กรุณารอสักครู่</span><small id="waitN"></small></div></div>
 <div id="modal" class="modal" hidden></div>
 <noscript><p style="padding:24px;text-align:center">ระบบนี้ต้องเปิดใช้ JavaScript</p></noscript>
-<script src="config.js?v=2569-10-03.1"></script>
-<script src="app.js?v=2569-10-03.1"></script>
-<script src="cand.js?v=2569-10-03.1"></script>
-<script src="staff.js?v=2569-10-03.1"></script>
-<script src="admin.js?v=2569-10-03.1"></script>
+<script src="config.js?v=2569-10-04.1"></script>
+<script src="app.js?v=2569-10-04.1"></script>
+<script src="cand.js?v=2569-10-04.1"></script>
+<script src="staff.js?v=2569-10-04.1"></script>
+<script src="admin.js?v=2569-10-04.1"></script>
 </body>
 </html>

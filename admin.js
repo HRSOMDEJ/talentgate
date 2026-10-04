@@ -12,7 +12,8 @@ function adminRoute(parts) {
   var fn = { bank: viewBank, positions: viewPositions, staff: viewPeople, settings: viewSettings }[parts[0]];
   if (!fn) { location.hash = '#/staff'; return; }
   if (!AD.data) $('#app').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>';
-  loadAdmin().then(function () { if (TG.view === 'admin') fn(parts[1]); }).catch(function (e) { toast(e.message, 'bad'); });
+  var first = !AD.data;
+  loadAdmin().then(function () { if (TG.view === 'admin') { if (first) enterAnim(); fn(parts[1]); } }).catch(function (e) { toast(e.message, 'bad'); });
 }
 function val(id, el) { var x = $('#' + id, el); return x ? x.value.trim() : ''; }
 
@@ -30,7 +31,7 @@ function newExamModal() {
       ev.preventDefault(); var src = d.exams.filter(function (e) { return e.examId === val('neC', b); })[0], secs;
       if (src) secs = src.sections.map(function (s) { return { type: s.type, title: s.title, minutes: s.minutes, sets: s.sets, shuffle: s.shuffle, instructions: s.instructions, rubric: s.rubric }; });
       else {
-        var c = d.sets.filter(function (s) { return s.active && s.kind === 'CENTRAL'; });
+        var c = d.sets.filter(function (s) { return s.active && s.kind === 'CENTRAL' && !/^ชุดเสริม/.test(s.note || ''); });   // ชุดเสริมไม่ถูกเลือกอัตโนมัติ
         secs = [{ type: 'PROFILE', title: 'ตอนที่ 1 ทัศนคติและบุคลิกภาพ', minutes: 10, sets: c.filter(function (s) { return s.qtype === 'SJT' || s.qtype === 'MBTI'; }).map(function (s) { return s.setId; }), instructions: 'ตอนนี้ไม่มีคำตอบถูกหรือผิด และไม่นำไปคิดคะแนน โปรดเลือกคำตอบที่ตรงกับสิ่งที่ท่านจะทำจริงมากที่สุด' },
           { type: 'THEORY', title: 'ตอนที่ 2 ภาคทฤษฎี', minutes: 50, shuffle: true, sets: c.filter(function (s) { return s.qtype === 'MCQ'; }).map(function (s) { return s.setId; }), instructions: 'เลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว ไม่อนุญาตให้ใช้อุปกรณ์สื่อสารหรือเครื่องมือ AI' }].filter(function (s) { return s.sets.length; });
       }
@@ -46,7 +47,7 @@ function newExamModal() {
 function tabSetup() {
   $('#tab').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>';
   loadAdmin(true).then(function (d) {
-    if (BD.tab !== 'setup') return;
+    if (BD.tab !== 'setup' || TG.view !== 'board' || !$('#tab')) return;
     var ex = d.exams.filter(function (e) { return e.examId === BD.id; })[0]; if (!ex) return;
     var secs = JSON.parse(JSON.stringify(ex.sections)), ro = ex.status === 'FINAL', lock = ex.hasAttempts, staff = d.staff.filter(function (u) { return u.active; });
     function setChips(s, i) {
@@ -63,7 +64,7 @@ function tabSetup() {
       var h = (lock ? '<div class="note warn">มีผู้เข้าสอบเริ่มทำข้อสอบแล้ว จึงเปลี่ยนประเภทตอน ชุดข้อสอบ หรือเพิ่ม/ลบตอนไม่ได้ (แก้ชื่อ เวลา คำชี้แจง เกณฑ์ และกรรมการได้)</div>' : '') + (ro ? '<div class="note warn">รอบสอบนี้ยืนยันผลแล้ว แก้ไขไม่ได้</div>' : '') +
         '<div class="card"><h2 class="card-t">ข้อมูลรอบสอบ</h2><div class="form"><label>ชื่อรอบสอบ<input id="sxT" maxlength="200" value="' + esc(ex.title) + '"></label><div class="row2"><label>ตำแหน่ง<select id="sxPos">' + d.positions.map(function (p) { return '<option value="' + esc(p.posId) + '"' + (p.posId === ex.posId ? ' selected' : '') + '>' + esc(p.name) + (p.dept ? ' · ' + esc(p.dept) : '') + '</option>'; }).join('') + '</select></label>' +
         '<label>เกณฑ์ผ่าน (ร้อยละของคะแนนเต็ม)<input id="sxPass" type="number" min="0" max="100" value="' + ex.passPct + '"></label></div><div class="row2"><label>วันและเวลาสอบ<input id="sxD" maxlength="100" value="' + esc(ex.examDate) + '"></label><label>สถานที่<input id="sxP" maxlength="200" value="' + esc(ex.place) + '"></label></div>' +
-        '<label>หมายเหตุ<input id="sxN" maxlength="500" value="' + esc(ex.note) + '"></label><label class="chk"><input type="checkbox" id="sxBlind"' + (ex.blind ? ' checked' : '') + '> ปิดชื่อผู้เข้าสอบระหว่างตรวจ (กรรมการเห็นเฉพาะเลขประจำตัวสอบ)</label></div></div>' +
+        '<label>หมายเหตุ<input id="sxN" maxlength="500" value="' + esc(ex.note) + '"></label><label class="chk"><input type="checkbox" id="sxBlind"' + (ex.blind ? ' checked' : '') + '> ปิดชื่อผู้เข้าสอบในหน้าตรวจ (เห็นเฉพาะเลขประจำตัวสอบ) — ไม่ติ๊ก = แสดงชื่อ-สกุลให้กรรมการเห็นขณะตรวจ · สลับได้จากสวิตช์ในแท็บตรวจเช่นกัน</label></div></div>' +
         '<div class="card"><h2 class="card-t">คณะกรรมการสอบรอบนี้</h2><p class="card-s">กรรมการเห็นและให้คะแนนได้เฉพาะรอบสอบที่ได้รับแต่งตั้ง · เพิ่มรายชื่อเจ้าหน้าที่ได้ที่เมนู "เจ้าหน้าที่"</p><div class="setgrp">' +
         staff.map(function (u) { return '<label class="setchip"><input type="checkbox" class="sx-cm" value="' + esc(u.empCode) + '"' + (ex.committee.indexOf(u.empCode) >= 0 ? ' checked' : '') + '><span><b>' + esc(u.name) + '</b><i>' + esc(u.empCode) + (u.roles.indexOf('ADMIN') >= 0 ? ' · ผู้ดูแล' : '') + '</i></span></label>'; }).join('') + '</div></div>' +
         '<div class="card-head"><h2 class="sec-h">ตอนสอบ <small class="muted">รวม ' + mins + ' นาที · ' + total + ' คะแนน</small></h2>' + (ro || lock ? '' : '<button class="btn ghost-dark sm" id="sxAdd">' + ICON.plus + 'เพิ่มตอน</button>') + '</div>';
@@ -201,24 +202,26 @@ function viewBank(setId) {
   var d = AD.data; if (setId) AD.setId = setId;
   if (!AD.setId || !d.sets.some(function (s) { return s.setId === AD.setId; })) AD.setId = d.sets.length ? d.sets[0].setId : null;
   function side() {
-    function grp(kind, label) { var l = d.sets.filter(function (s) { return s.kind === kind; }); return '<div class="bk-g"><small>' + label + '</small>' + (l.length ? l.map(function (s) { return '<a class="bk-s' + (s.setId === AD.setId ? ' on' : '') + (s.active ? '' : ' off') + '" href="#/admin/bank/' + encodeURIComponent(s.setId) + '"><b>' + esc(s.name) + '</b><i>' + QT_TH[s.qtype].split(' ')[0] + ' · ' + s.n + ' ข้อ' + (s.active ? '' : ' · ปิดใช้งาน') + '</i></a>'; }).join('') : '<p class="muted sm">ยังไม่มี</p>') + '</div>'; }
+    function grp(kind, label) { var l = AD.data.sets.filter(function (s) { return s.kind === kind; }); return '<div class="bk-g"><small>' + label + '</small>' + (l.length ? l.map(function (s) { return '<a class="bk-s' + (s.setId === AD.setId ? ' on' : '') + (s.active ? '' : ' off') + '" href="#/admin/bank/' + encodeURIComponent(s.setId) + '"><b>' + esc(s.name) + '</b><i>' + QT_TH[s.qtype].split(' ')[0] + ' · ' + s.n + ' ข้อ' + (s.active ? '' : ' · ปิดใช้งาน') + '</i></a>'; }).join('') : '<p class="muted sm">ยังไม่มี</p>') + '</div>'; }
     return grp('CENTRAL', 'ชุดกลาง — ใช้ได้กับทุกตำแหน่ง') + grp('POSITION', 'ชุดเฉพาะตำแหน่ง');
   }
-  $('#app').innerHTML = '<div class="wrap"><div class="phead"><div><span class="eyebrow">ผู้ดูแลระบบ</span><h1>คลังข้อสอบ</h1><p class="muted">จัดข้อสอบเป็นชุด แล้วเลือกชุดไปใช้ในแต่ละรอบสอบที่หน้า "ตั้งค่ารอบสอบ" · ชุดกลางใช้ซ้ำได้ทุกตำแหน่ง</p></div><button class="btn primary" id="bkNew">' + ICON.plus + 'สร้างชุดข้อสอบ</button></div>' +
+  $('#app').innerHTML = '<div class="wrap"><div class="phead"><div><span class="eyebrow">ผู้ดูแลระบบ</span><h1>คลังข้อสอบ</h1><p class="muted">จัดข้อสอบเป็นชุด แล้วเลือกชุดไปใช้ในแต่ละรอบสอบที่หน้า "ตั้งค่ารอบสอบ" · ชุดกลางใช้ซ้ำได้ทุกตำแหน่ง</p></div><div class="acts"><a class="btn ghost-dark" href="TalentGate_Import_Template.xlsx" download>' + ICON.down + 'แม่แบบนำเข้า (Excel)</a><button class="btn ghost-dark" id="bkImp">' + ICON.up + 'นำเข้าข้อสอบทั้งชุด</button><button class="btn primary" id="bkNew">' + ICON.plus + 'สร้างชุดข้อสอบ</button></div></div>' +
     '<div class="bank"><aside class="card bk-side">' + side() + '</aside><div id="bkMain"></div></div><div id="printArea"></div></div>';
   $('#bkNew').onclick = function () { setBox(null); };
+  $('#bkImp').onclick = function () { importQBox(null, function (r) { AD.setId = r.setId; AD.at = 0; AD.qs = null; if ($('#bkMain')) $('#bkMain').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>'; go('#/admin/bank/' + encodeURIComponent(r.setId)); }); };
   function setBox(s) {
     var b = modal('<h2>' + (s ? 'แก้ไขชุดข้อสอบ' : 'สร้างชุดข้อสอบ') + '</h2><form class="form" id="sbF"><label>ชื่อชุด<input id="sbN" maxlength="160" required value="' + esc(s ? s.name : '') + '" placeholder="เช่น ตำแหน่งนักวิชาการเงินและบัญชี · ความรู้เฉพาะ" autofocus></label>' +
       '<div class="row2"><label>ประเภทชุด<select id="sbK"><option value="CENTRAL"' + (s && s.kind === 'CENTRAL' ? ' selected' : '') + '>ชุดกลาง (ทุกตำแหน่ง)</option><option value="POSITION"' + (s && s.kind === 'POSITION' ? ' selected' : '') + '>ชุดเฉพาะตำแหน่ง</option></select></label>' +
       '<label>ชนิดข้อสอบ<select id="sbQ"' + (s ? ' disabled' : '') + '>' + Object.keys(QT_TH).map(function (k) { return '<option value="' + k + '"' + (s && s.qtype === k ? ' selected' : '') + '>' + QT_TH[k] + '</option>'; }).join('') + '</select></label></div><label>หมายเหตุ<input id="sbT" maxlength="300" value="' + esc(s ? s.note : '') + '"></label>' +
       (s ? '<label class="chk"><input type="checkbox" id="sbA"' + (s.active ? ' checked' : '') + '> เปิดใช้งาน (ให้เลือกในรอบสอบใหม่ได้)</label>' : '') + '<div class="modal-act"><button type="button" class="btn ghost-dark" id="sbX">ยกเลิก</button><button class="btn primary">บันทึก</button></div></form>', { cls: 'sm' });
     $('#sbX', b).onclick = closeModal;
-    $('#sbF', b).onsubmit = function (e) { e.preventDefault(); api('saveSet', { setId: s ? s.setId : '', name: val('sbN', b), kind: val('sbK', b), qtype: val('sbQ', b), note: val('sbT', b), active: s ? $('#sbA', b).checked : true }).then(function (r) { closeModal(); toast('บันทึกชุดข้อสอบแล้ว', 'ok'); AD.setId = r.setId; $('#bkMain').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>'; return loadAdmin(true); }).then(function () { viewBank(); }).catch(function (er) { toast(er.message, 'bad'); }); };
+    $('#sbF', b).onsubmit = function (e) { e.preventDefault(); api('saveSet', { setId: s ? s.setId : '', name: val('sbN', b), kind: val('sbK', b), qtype: val('sbQ', b), note: val('sbT', b), active: s ? $('#sbA', b).checked : true }).then(function (r) { closeModal(); toast('บันทึกชุดข้อสอบแล้ว', 'ok'); AD.setId = r.setId; if ($('#bkMain')) $('#bkMain').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>'; return loadAdmin(true); }).then(function () { if (TG.view === 'admin' && $('.bank')) viewBank(); }).catch(function (er) { toast(er.message, 'bad'); }); };
   }
   function main() {
-    var r = AD.qs, s = r.set, qs = r.questions, pts = qs.filter(function (q) { return q.active; }).reduce(function (a, q) { return a + q.points; }, 0);
-    var h = '<div class="card"><div class="card-head"><div><span class="tag ' + (s.kind === 'CENTRAL' ? 'info' : '') + '">' + (s.kind === 'CENTRAL' ? 'ชุดกลาง' : 'ชุดเฉพาะตำแหน่ง') + '</span> <span class="tag">' + QT_TH[s.qtype] + '</span>' + (s.inUse ? ' <span class="tag warn">ใช้ในรอบที่มีผู้สอบแล้ว</span>' : '') + '<h2 class="card-t mt6">' + esc(s.name) + '</h2><p class="card-s">' + qs.length + ' ข้อ' + (pts ? ' · ' + pts + ' คะแนน' : '') + (s.note ? ' · ' + esc(s.note) : '') + '</p></div><div class="acts">' +
-      '<button class="btn ghost-dark sm" id="bkEd">' + ICON.edit + 'แก้ไขชุด</button><button class="btn ghost-dark sm" id="bkPr">' + ICON.print + 'พิมพ์พร้อมเฉลย</button><button class="btn primary sm" id="bkAdd">' + ICON.plus + 'เพิ่มข้อ</button></div></div>' +
+    var r = AD.qs, s = r.set, qs = r.questions, pts = qs.filter(function (q) { return q.active; }).reduce(function (a, q) { return a + q.points; }, 0), nOn = qs.filter(function (q) { return q.active; }).length;
+    var h = '<div class="card"><div class="card-head"><div><span class="tag ' + (s.kind === 'CENTRAL' ? 'info' : '') + '">' + (s.kind === 'CENTRAL' ? 'ชุดกลาง' : 'ชุดเฉพาะตำแหน่ง') + '</span> <span class="tag">' + QT_TH[s.qtype] + '</span>' + (s.inUse ? ' <span class="tag warn">ใช้ในรอบที่มีผู้สอบแล้ว</span>' : '') + '<h2 class="card-t mt6">' + esc(s.name) + '</h2><p class="card-s" id="bkSum">เลือกใช้ <b>' + nOn + '</b> จาก ' + qs.length + ' ข้อ' + (pts ? ' · ' + pts + ' คะแนน' : '') + (s.note ? ' · ' + esc(s.note) : '') + '</p></div><div class="acts">' +
+      '<button class="btn ghost-dark sm" id="bkEd">' + ICON.edit + 'แก้ไขชุด</button><button class="btn ghost-dark sm" id="bkIm2">' + ICON.up + 'นำเข้าเพิ่มในชุดนี้</button><button class="btn ghost-dark sm" id="bkEx">' + ICON.down + 'ส่งออก (CSV)</button><button class="btn ghost-dark sm" id="bkPr">' + ICON.print + 'พิมพ์พร้อมเฉลย</button><button class="btn primary sm" id="bkAdd">' + ICON.plus + 'เพิ่มข้อ</button></div></div>' +
+      (qs.length ? '<div class="selbar"><span class="muted sm">สวิตช์หน้าข้อ = เลือกใช้ข้อนั้นในรอบสอบที่ติ๊กชุดนี้ (ข้อที่ปิดจะไม่ออกสอบและไม่นับคะแนน)</span><span class="acts"><button class="btn link" id="bkAll">เลือกทั้งหมด</button><button class="btn link" id="bkNone">ไม่เลือกทั้งหมด</button></span></div>' : '') +
       (s.inUse ? '<div class="note warn">ชุดนี้ถูกใช้ในรอบสอบที่มีผู้เข้าสอบทำแล้ว การแก้เฉลยจะมีผลต่อคะแนนเมื่อกด "คำนวณคะแนนปรนัยใหม่" ในหน้าสรุปผลของรอบนั้น</div>' : '') + '</div>';
     if (!qs.length) h += '<div class="card empty"><h3>ชุดนี้ยังไม่มีข้อสอบ</h3><p class="muted">กด "เพิ่มข้อ" เพื่อเริ่มต้น</p></div>';
     qs.forEach(function (q, i) {
@@ -227,10 +230,24 @@ function viewBank(setId) {
       else if (q.type === 'SJT') { var lv = q.answer.split(','); body = '<ol class="bq-c">' + q.choices.map(function (c, j) { return '<li><i>' + TH[j] + '</i>' + esc(c) + '<span class="lvb lv' + lv[j] + '">ระดับ ' + lv[j] + '</span></li>'; }).join('') + '</ol>'; }
       else if (q.type === 'MBTI') body = '<ol class="bq-c">' + q.choices.map(function (c) { var p = c.split('|'); return '<li><i>' + esc(p[0]) + '</i>' + esc(p.slice(1).join('|')) + '</li>'; }).join('') + '</ol>';
       else body = '<div class="bq-r"><b>เกณฑ์ให้คะแนน</b><br>' + nl2br(q.rubric) + '</div>';
-      h += '<article class="card bq' + (q.active ? '' : ' off') + '" data-q="' + esc(q.qId) + '"><header><span class="qn">ข้อ ' + (i + 1) + '</span>' + (q.cat ? '<span class="tag">' + esc(q.cat) + '</span>' : '') + (q.points ? '<span class="qp">' + q.points + ' คะแนน</span>' : '') + (q.active ? '' : '<span class="tag bad">ปิดใช้งาน</span>') + '<span class="bq-id">' + esc(q.qId) + '</span>' +
+      h += '<article class="card bq' + (q.active ? '' : ' off') + '" data-q="' + esc(q.qId) + '"><header><label class="sw sm" title="เลือกใช้ข้อนี้"><input type="checkbox" class="bq-on"' + (q.active ? ' checked' : '') + '><i></i></label><span class="qn">ข้อ ' + (i + 1) + '</span>' + (q.cat ? '<span class="tag">' + esc(q.cat) + '</span>' : '') + (q.points ? '<span class="qp">' + q.points + ' คะแนน</span>' : '') + '<span class="tag bad bq-offtag"' + (q.active ? ' hidden' : '') + '>ไม่ใช้ข้อนี้</span><span class="bq-id">' + esc(q.qId) + '</span>' +
         '<button class="btn link bq-ed">' + ICON.edit + 'แก้ไข</button><button class="btn link danger-t bq-del">ลบ</button></header><div class="qt">' + nl2br(q.text) + '</div>' + body + '<p class="bq-ref"><b>ที่มา:</b> ' + (q.ref ? esc(q.ref) : '<span class="bad-t">ยังไม่ได้ระบุ</span>') + '</p></article>';
     });
-    $('#bkMain').innerHTML = h;
+    $('#bkMain').innerHTML = h + '<div class="savebar float" id="bkSave" hidden><span id="bkChg"></span><button class="btn ghost-dark sm" id="bkUndo">ยกเลิก</button><button class="btn primary" id="bkDo">บันทึกการเลือกข้อสอบ</button></div>';
+    function pending() { var ch = {}; $$('.bq').forEach(function (card) { var q = qs.filter(function (x) { return x.qId === card.dataset.q; })[0], on = $('.bq-on', card).checked; card.classList.toggle('off', !on); $('.bq-offtag', card).hidden = on; if (on !== q.active) ch[q.qId] = on; }); return ch; }
+    function selPaint() {
+      var ch = pending(), n = Object.keys(ch).length, on = $$('.bq-on').filter(function (x) { return x.checked; }).length, p2 = 0;
+      $$('.bq').forEach(function (card) { if ($('.bq-on', card).checked) p2 += qs.filter(function (x) { return x.qId === card.dataset.q; })[0].points; });
+      $('#bkSum').innerHTML = 'เลือกใช้ <b>' + on + '</b> จาก ' + qs.length + ' ข้อ' + (p2 ? ' · ' + p2 + ' คะแนน' : '') + (s.note ? ' · ' + esc(s.note) : '');
+      $('#bkSave').hidden = !n; $('#bkChg').textContent = 'เปลี่ยนการเลือก ' + n + ' ข้อ — ยังไม่ได้บันทึก';
+    }
+    $$('.bq-on').forEach(function (x) { x.onchange = selPaint; });
+    if ($('#bkAll')) $('#bkAll').onclick = function () { $$('.bq-on').forEach(function (x) { x.checked = true; }); selPaint(); };
+    if ($('#bkNone')) $('#bkNone').onclick = function () { $$('.bq-on').forEach(function (x) { x.checked = false; }); selPaint(); };
+    $('#bkUndo').onclick = function () { main(); };
+    $('#bkDo').onclick = function () { var b = this; busy(b, true, 'กำลังบันทึก…'); api('setQuestionsActive', { setId: s.setId, active: pending() }).then(function (x) { toast('บันทึกการเลือกแล้ว ' + x.n + ' ข้อ', 'ok'); AD.at = 0; BD.at = 0; loadQs(); loadAdmin(true).then(function () { if ($('.bk-side')) $('.bk-side').innerHTML = side(); }); }).catch(function (e) { busy(b, false); toast(e.message, 'bad'); }); };
+    $('#bkIm2').onclick = function () { importQBox(s, function () { AD.at = 0; loadQs(); loadAdmin(true).then(function () { if ($('.bk-side')) $('.bk-side').innerHTML = side(); }); }); };
+    $('#bkEx').onclick = function () { saveCsv('TalentGate_Bank_' + s.setId + '.csv', [IMP_HEAD].concat(qs.map(qToRow))); toast('ส่งออกแล้ว — เปิดด้วย Excel แก้ไข แล้วนำเข้ากลับได้ด้วยแม่แบบเดียวกัน', 'ok', 6000); };
     $('#bkEd').onclick = function () { setBox(s); };
     $('#bkAdd').onclick = function () { qBox(null, s); };
     $('#bkPr').onclick = function () {
@@ -265,13 +282,159 @@ function viewBank(setId) {
       if (t === 'MBTI') choices = choices.map(function (c, j) { return $$('.qb-k', b)[j].value.trim().toUpperCase() + '|' + c; });
       busy($('#qbS', b), true);
       api('saveQuestion', { qId: q ? q.qId : '', setId: s.setId, type: t, cat: val('qbCat', b), text: val('qbT', b), choices: choices, answer: ans, points: $('#qbP', b) ? Number(val('qbP', b)) : 0, order: $('#qbO', b) ? Number(val('qbO', b)) : (q ? q.order : 0), rubric: val('qbR', b), ref: val('qbRef', b), active: q ? $('#qbA', b).checked : true })
-        .then(function () { closeModal(); toast('บันทึกข้อสอบแล้ว', 'ok'); loadQs(); loadAdmin(true).then(function () { $('.bk-side').innerHTML = side(); }); }).catch(function (er) { busy($('#qbS', b), false); toast(er.message, 'bad'); });
+        .then(function () { closeModal(); toast('บันทึกข้อสอบแล้ว', 'ok'); loadQs(); loadAdmin(true).then(function () { if ($('.bk-side')) $('.bk-side').innerHTML = side(); }); }).catch(function (er) { busy($('#qbS', b), false); toast(er.message, 'bad'); });
     };
   }
-  function loadQs() { if (!AD.setId) { $('#bkMain').innerHTML = '<div class="card empty"><h3>ยังไม่มีชุดข้อสอบ</h3></div>'; return; } $('#bkMain').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>'; api('getQuestions', { setId: AD.setId }).then(function (r) { AD.qs = r; if (TG.view === 'admin') main(); }).catch(function (e) { toast(e.message, 'bad'); }); }
+  function loadQs() { if (!$('#bkMain')) return; if (!AD.setId) { $('#bkMain').innerHTML = '<div class="card empty"><h3>ยังไม่มีชุดข้อสอบ</h3></div>'; return; } $('#bkMain').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>'; api('getQuestions', { setId: AD.setId }).then(function (r) { AD.qs = r; if (TG.view === 'admin' && $('#bkMain')) main(); }).catch(function (e) { toast(e.message, 'bad'); }); }
   loadQs();
 }
 function uniq(a) { return a.filter(function (x, i) { return x && a.indexOf(x) === i; }); }
+
+/* ====================== นำเข้า/ส่งออกข้อสอบทั้งชุด (แม่แบบ Excel · CSV · วางจากตาราง) ====================== */
+var IMP_HEAD = ['ประเภท', 'หมวด', 'โจทย์', 'ตัวเลือก ก', 'ตัวเลือก ข', 'ตัวเลือก ค', 'ตัวเลือก ง', 'เฉลย', 'คะแนน', 'คำอธิบายเฉลย / เกณฑ์ให้คะแนน', 'ที่มา', 'ใช้งาน'];
+var IMP_TYPE = { MCQ: 'ปรนัย', ESSAY: 'ข้อเขียน', SJT: 'สถานการณ์', MBTI: 'บุคลิกภาพ' };
+function qToRow(q) {
+  var c = q.choices || [], ans = q.type === 'MCQ' ? (TH[Number(q.answer) - 1] || '') : q.answer;
+  return [IMP_TYPE[q.type], q.cat, q.text, c[0] || '', c[1] || '', c[2] || '', c[3] || '', ans, q.type === 'MCQ' || q.type === 'ESSAY' ? q.points : '', q.rubric, q.ref, q.active ? 1 : 0];
+}
+/** แยกข้อความแบบตาราง (คั่นด้วยแท็บหรือจุลภาค รองรับเซลล์ที่มีเครื่องหมายคำพูดและขึ้นบรรทัดใหม่) → [[เซลล์]] */
+function parseDelimited(txt, sep) {
+  txt = String(txt || '').replace(/^﻿/, '');
+  if (!sep) sep = txt.indexOf('\t') >= 0 ? '\t' : ',';
+  var rows = [], row = [], cell = '', q = false, i = 0, n = txt.length, ch;
+  while (i < n) {
+    ch = txt[i];
+    if (q) { if (ch === '"') { if (txt[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"' && cell === '') q = true;
+    else if (ch === sep) { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') { if (ch === '\r' && txt[i + 1] === '\n') i++; row.push(cell); cell = ''; rows.push(row); row = []; }
+    else cell += ch;
+    i++;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(function (r) { return r.some(function (x) { return String(x).trim() !== ''; }); });
+}
+/** อ่านไฟล์ .xlsx ในเบราว์เซอร์โดยไม่ใช้ไลบรารีภายนอก (แตก zip ด้วย DecompressionStream) → [[เซลล์]] ของชีต "ข้อสอบ" หรือชีตแรก */
+function readXlsx(file) {
+  if (typeof DecompressionStream === 'undefined') return Promise.reject(new Error('เบราว์เซอร์นี้อ่านไฟล์ Excel โดยตรงไม่ได้ — ให้เปิดไฟล์ใน Excel คัดลอกตารางแล้ววางในช่องด้านล่างแทน'));
+  return file.arrayBuffer().then(function (buf) {
+    var dv = new DataView(buf), i = buf.byteLength - 22, files = {}, dec = new TextDecoder();
+    while (i >= 0 && dv.getUint32(i, true) !== 0x06054b50) i--;
+    if (i < 0) throw new Error('ไฟล์นี้ไม่ใช่ไฟล์ Excel (.xlsx)');
+    var cnt = dv.getUint16(i + 10, true), off = dv.getUint32(i + 16, true);
+    for (var k = 0; k < cnt; k++) {
+      var nl = dv.getUint16(off + 28, true), el = dv.getUint16(off + 30, true), cl = dv.getUint16(off + 32, true);
+      files[dec.decode(new Uint8Array(buf, off + 46, nl))] = { method: dv.getUint16(off + 10, true), csize: dv.getUint32(off + 20, true), lho: dv.getUint32(off + 42, true) };
+      off += 46 + nl + el + cl;
+    }
+    function text(name) {
+      var f = files[name]; if (!f) return Promise.resolve('');
+      var start = f.lho + 30 + dv.getUint16(f.lho + 26, true) + dv.getUint16(f.lho + 28, true), data = new Uint8Array(buf, start, f.csize);
+      if (f.method === 0) return Promise.resolve(dec.decode(data));
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+    }
+    var xml = function (t) { return new DOMParser().parseFromString(t, 'application/xml'); };
+    var tags = function (el, name) { return Array.prototype.slice.call(el.getElementsByTagName(name)); };
+    return Promise.all([text('xl/workbook.xml'), text('xl/_rels/workbook.xml.rels'), text('xl/sharedStrings.xml')]).then(function (a) {
+      if (!a[0]) throw new Error('ไฟล์นี้ไม่ใช่ไฟล์ Excel (.xlsx)');
+      var sheets = tags(xml(a[0]), 'sheet').map(function (x) { return { name: x.getAttribute('name'), rid: x.getAttribute('r:id') }; }), rel = {};
+      tags(xml(a[1]), 'Relationship').forEach(function (x) { rel[x.getAttribute('Id')] = x.getAttribute('Target'); });
+      var pick = sheets.filter(function (x) { return x.name === 'ข้อสอบ'; })[0] || sheets[0], tgt = rel[pick.rid] || 'worksheets/sheet1.xml';
+      tgt = tgt.charAt(0) === '/' ? tgt.slice(1) : 'xl/' + tgt.replace(/^\.\//, '');
+      var sst = a[2] ? tags(xml(a[2]), 'si').map(function (si) { return tags(si, 't').filter(function (t) { return t.parentNode.nodeName !== 'rPh'; }).map(function (t) { return t.textContent; }).join(''); }) : [];
+      return text(tgt).then(function (st) {
+        if (!st) throw new Error('อ่านชีตในไฟล์ไม่ได้');
+        var rows = [];
+        tags(xml(st), 'row').forEach(function (r) {
+          var out = [];
+          tags(r, 'c').forEach(function (c) {
+            var ref = c.getAttribute('r') || '', col = 0, m = ref.match(/^[A-Z]+/);
+            if (m) { for (var j = 0; j < m[0].length; j++) col = col * 26 + (m[0].charCodeAt(j) - 64); col--; } else col = out.length;
+            var t = c.getAttribute('t'), v = tags(c, 'v')[0], val = '';
+            if (t === 's') val = sst[Number(v ? v.textContent : -1)] || '';
+            else if (t === 'inlineStr') val = tags(c, 't').map(function (x) { return x.textContent; }).join('');
+            else val = v ? v.textContent : '';
+            while (out.length < col) out.push('');
+            out[col] = val;
+          });
+          rows.push(out);
+        });
+        return rows.filter(function (r) { return r.some(function (x) { return String(x).trim() !== ''; }); });
+      });
+    });
+  });
+}
+/** แปลงตาราง → ข้อสอบ + ตรวจเบื้องต้น (หลังบ้านตรวจซ้ำอีกครั้ง) */
+function rowsToQuestions(rows) {
+  if (!rows.length) return [];
+  var norm = function (x) { return String(x === undefined || x === null ? '' : x).replace(/\r\n?/g, '\n').trim(); };
+  var hi = -1; for (var i = 0; i < Math.min(rows.length, 6); i++) if (rows[i].some(function (x) { return /^(โจทย์|คำถาม|question|text)$/i.test(norm(x)); })) { hi = i; break; }
+  var map = { type: 0, cat: 1, text: 2, c1: 3, c2: 4, c3: 5, c4: 6, answer: 7, points: 8, rubric: 9, ref: 10, active: 11 };
+  if (hi >= 0) {
+    map = {};
+    rows[hi].forEach(function (h, j) {
+      h = norm(h).toLowerCase();
+      var k = /^(ประเภท|ชนิด|type)/.test(h) ? 'type' : /^(หมวด|มิติ|หัวข้อ|cat)/.test(h) ? 'cat' : /^(โจทย์|คำถาม|question|text)/.test(h) ? 'text' : /^(ตัวเลือก\s*)?(ก|a|1)\.?$/.test(h) ? 'c1' : /^(ตัวเลือก\s*)?(ข|b|2)\.?$/.test(h) ? 'c2' : /^(ตัวเลือก\s*)?(ค|c|3)\.?$/.test(h) ? 'c3' : /^(ตัวเลือก\s*)?(ง|d|4)\.?$/.test(h) ? 'c4' :
+        /^(เฉลย|คำตอบ|answer|ระดับ)/.test(h) ? 'answer' : /^(คะแนน|point|score)/.test(h) ? 'points' : /^(คำอธิบาย|เกณฑ์|แนว|rubric|explain)/.test(h) ? 'rubric' : /^(ที่มา|อ้างอิง|แหล่ง|ref|source)/.test(h) ? 'ref' : /^(ใช้งาน|ใช้|active)/.test(h) ? 'active' : null;
+      if (k && map[k] === undefined) map[k] = j;
+    });
+    if (map.text === undefined) return [];
+  }
+  var g = function (r, k) { return map[k] === undefined ? '' : norm(r[map[k]]); };
+  return rows.slice(hi + 1).map(function (r) {
+    var t = g(r, 'type').toLowerCase(), ch = [g(r, 'c1'), g(r, 'c2'), g(r, 'c3'), g(r, 'c4')], ans = g(r, 'answer'), pts = g(r, 'points'), act = g(r, 'active').toLowerCase(), err = '';
+    var type = /ปรนัย|mcq|เลือกตอบ/.test(t) ? 'MCQ' : /เขียน|อัตนัย|essay/.test(t) ? 'ESSAY' : /สถานการณ์|ทัศนคติ|sjt/.test(t) ? 'SJT' : /บุคลิก|mbti/.test(t) ? 'MBTI' : (ch[0] && ch[2] ? 'MCQ' : ch[0] ? 'MBTI' : 'ESSAY');
+    var q = { type: type, cat: g(r, 'cat'), text: g(r, 'text'), choices: [], answer: '', points: 0, rubric: g(r, 'rubric'), ref: g(r, 'ref'), active: !/^(0|ไม่|no|n|false|ปิด)/.test(act) };
+    if (!q.text) err = 'ไม่มีโจทย์';
+    if (type === 'MCQ') {
+      q.choices = ch; var a = ans.replace(/[.\s)]/g, '').toLowerCase(), ix = { 'ก': 1, 'ข': 2, 'ค': 3, 'ง': 4, a: 1, b: 2, c: 3, d: 4, '1': 1, '2': 2, '3': 3, '4': 4 }[a];
+      q.answer = ix ? String(ix) : ''; q.points = pts === '' ? 1 : Number(pts);
+      if (ch.some(function (x) { return !x; })) err = err || 'ตัวเลือกไม่ครบ 4 ข้อ';
+      if (!ix) err = err || 'เฉลยต้องเป็น ก ข ค หรือ ง';
+      if (!(q.points > 0)) err = err || 'คะแนนต้องมากกว่า 0';
+    } else if (type === 'SJT') {
+      q.choices = ch; q.answer = ans.replace(/[^1-4]/g, '').split('').join(',');
+      if (ch.some(function (x) { return !x; })) err = err || 'ตัวเลือกไม่ครบ 4 ข้อ';
+      if (q.answer.split(',').length !== 4) err = err || 'ช่องเฉลยต้องเป็นระดับ 1–4 ของตัวเลือก ก ข ค ง เช่น 4,2,1,3';
+      if (!q.cat) err = err || 'ต้องระบุมิติที่วัดในช่องหมวด';
+    } else if (type === 'MBTI') {
+      q.choices = ch.slice(0, 2).map(function (x) { return x.replace(/^([A-Za-z])\s*[|:)\-]\s*/, function (m, l) { return l.toUpperCase() + '|'; }); });
+      if (q.choices.some(function (x) { return !/^[A-Z]\|.+/.test(x); })) err = err || 'ตัวเลือก ก และ ข ต้องเป็นรูปแบบ "อักษร|ข้อความ" เช่น E|ชอบพบปะผู้คน';
+    } else { q.points = pts === '' ? 5 : Number(pts); if (!(q.points > 0)) err = err || 'คะแนนต้องมากกว่า 0'; if (!q.rubric) err = err || 'ข้อเขียนต้องมีเกณฑ์ให้คะแนน'; }
+    q.err = err; return q;
+  }).filter(function (q) { return q.text || q.choices.some(String); });
+}
+function importQBox(set, done) {
+  var d = AD.data, qs = [];
+  var b = modal('<h2>นำเข้าข้อสอบ' + (set ? 'เพิ่มในชุด "' + esc(set.name) + '"' : 'ทั้งชุด') + '</h2>' +
+    '<ol class="impsteps"><li><b>ดาวน์โหลดแม่แบบ</b> แล้วกรอกข้อสอบ 1 ข้อต่อ 1 แถว (ดูตัวอย่างในชีต "ตัวอย่างและคำอธิบาย") <a class="btn ghost-dark sm" href="TalentGate_Import_Template.xlsx" download>' + ICON.down + 'แม่แบบ Excel</a></li>' +
+    '<li><b>เลือกไฟล์</b> .xlsx หรือ .csv <label class="btn primary sm">' + ICON.up + 'เลือกไฟล์<input type="file" id="iqF" accept=".xlsx,.csv,.tsv,.txt" hidden></label> <span class="muted sm">หรือคัดลอกตารางจาก Excel (รวมแถวหัวตาราง) มาวางที่ช่องนี้</span><textarea id="iqT" rows="3" placeholder="วางข้อมูลที่คัดลอกจาก Excel ที่นี่ (Ctrl+V)"></textarea></li>' +
+    (set ? '' : '<li><b>นำเข้าเป็นชุดใหม่</b><div class="row2"><label>ชื่อชุดข้อสอบ<input id="iqN" maxlength="160" placeholder="เช่น ตำแหน่งนักวิชาการเงินและบัญชี · ความรู้เฉพาะ"></label><label>ประเภทชุด<select id="iqK"><option value="POSITION">ชุดเฉพาะตำแหน่ง</option><option value="CENTRAL">ชุดกลาง (ทุกตำแหน่ง)</option></select></label></div></li>') +
+    '</ol><div id="iqP" class="imprev"></div><div class="modal-act"><button class="btn ghost-dark" id="iqX">ยกเลิก</button><button class="btn primary" id="iqS" disabled>นำเข้า</button></div>', { cls: 'xl' });
+  function show(rows) {
+    qs = rowsToQuestions(rows); var bad = qs.filter(function (q) { return q.err; }).length;
+    $('#iqP', b).innerHTML = !qs.length ? '<p class="bad-t">อ่านข้อสอบไม่ได้ — ตรวจว่ามีแถวหัวตารางที่มีคอลัมน์ "โจทย์" ตามแม่แบบ</p>' :
+      '<p class="' + (bad ? 'bad-t' : 'ok-t') + '">อ่านได้ ' + qs.length + ' ข้อ' + (bad ? ' · <b>มีข้อผิดพลาด ' + bad + ' ข้อ</b> (แก้ในไฟล์แล้วเลือกใหม่)' : ' · พร้อมนำเข้า') + ' — ' + Object.keys(IMP_TYPE).map(function (k) { var n = qs.filter(function (q) { return q.type === k; }).length; return n ? IMP_TYPE[k] + ' ' + n : ''; }).filter(String).join(' · ') + '</p>' +
+      '<div class="tblwrap sm"><table class="tbl sm"><thead><tr><th>#</th><th>ประเภท</th><th>หมวด</th><th>โจทย์</th><th>เฉลย</th><th class="r">คะแนน</th><th>ที่มา</th><th>ตรวจ</th></tr></thead><tbody>' + qs.map(function (q, i) {
+        return '<tr class="' + (q.err ? 'badrow' : '') + '"><td>' + (i + 1) + '</td><td>' + IMP_TYPE[q.type] + '</td><td>' + esc(q.cat) + '</td><td>' + esc(q.text.slice(0, 90)) + (q.text.length > 90 ? '…' : '') + '</td><td>' + (q.type === 'MCQ' ? (TH[q.answer - 1] || '?') + '. ' + esc((q.choices[q.answer - 1] || '').slice(0, 40)) : esc(q.answer)) + '</td><td class="r">' + (q.points || '') + '</td><td>' + (q.ref ? '<span class="ok-t">มี</span>' : '<span class="bad-t">ไม่มี</span>') + '</td><td>' + (q.err ? '<b class="bad-t">' + esc(q.err) + '</b>' : '<span class="ok-t">ถูกต้อง</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+    $('#iqS', b).disabled = !qs.length || bad > 0; $('#iqS', b).textContent = qs.length && !bad ? 'นำเข้า ' + qs.length + ' ข้อ' : 'นำเข้า';
+  }
+  $('#iqX', b).onclick = closeModal;
+  $('#iqT', b).oninput = function () { show(parseDelimited(this.value)); };
+  $('#iqF', b).onchange = function () {
+    var f = this.files[0]; if (!f) return; this.value = '';
+    $('#iqP', b).innerHTML = '<p class="muted"><i class="spin dark"></i> กำลังอ่านไฟล์ ' + esc(f.name) + '…</p>';
+    if (!$('#iqN', b) || $('#iqN', b).value) { } else $('#iqN', b).value = f.name.replace(/\.[^.]+$/, '').slice(0, 160);
+    (/\.xlsx$/i.test(f.name) ? readXlsx(f) : f.text().then(function (t) { return parseDelimited(t); })).then(show).catch(function (e) { $('#iqP', b).innerHTML = '<p class="bad-t">' + esc(e.message) + '</p>'; });
+  };
+  $('#iqS', b).onclick = function () {
+    var bt = this, p = { rows: qs.map(function (q) { return { type: q.type, cat: q.cat, text: q.text, choices: q.choices, answer: q.answer, points: q.points, rubric: q.rubric, ref: q.ref, active: q.active }; }) };
+    if (set) p.setId = set.setId; else { if (!val('iqN', b)) return toast('กรุณากรอกชื่อชุดข้อสอบ', 'bad'); p.newSet = { name: val('iqN', b), kind: val('iqK', b) }; }
+    busy(bt, true, 'กำลังนำเข้า…');
+    api('importQuestions', p, { timeout: 120000 }).then(function (r) { closeModal(); toast('นำเข้าข้อสอบ ' + r.n + ' ข้อเรียบร้อย', 'ok'); AD.at = 0; BD.at = 0; done(r); }).catch(function (e) { busy(bt, false); toast(e.message, 'bad', 12000); });
+  };
+}
 
 /* ====================== ตำแหน่ง ====================== */
 function viewPositions() {
@@ -318,16 +481,86 @@ function viewPeople() {
 function viewSettings() {
   var d = AD.data, s = d.settings;
   $('#app').innerHTML = '<div class="wrap"><div class="phead"><div><span class="eyebrow">ผู้ดูแลระบบ</span><h1>ตั้งค่าระบบ</h1></div></div><div class="grid2"><div class="card"><h2 class="card-t">ข้อความบนหน้าเว็บ</h2><form class="form" id="stF"><label>ชื่อหน่วยงาน (ท้ายหน้าเว็บ)<input id="stO" maxlength="300" value="' + esc(s.orgName) + '"></label><label>ช่องทางติดต่อ (หน้าผู้เข้าสอบ)<input id="stC" maxlength="300" value="' + esc(s.contact) + '"></label>' +
-    '<label>ข้อปฏิบัติของผู้เข้าสอบ (บรรทัดละ 1 ข้อ)<textarea id="stR" rows="6" maxlength="1900">' + esc(String(s.candRules || '').split('|').join('\n')) + '</textarea></label><label>จำนวนครั้งที่ผู้เข้าสอบกรอกรหัสผิดได้ก่อนพัก 5 นาที<input id="stL" type="number" min="3" max="30" value="' + esc(s.candFailLimit || 8) + '"></label><button class="btn primary" id="stS">บันทึกการตั้งค่า</button></form></div>' +
+    '<label>ข้อปฏิบัติของผู้เข้าสอบ (บรรทัดละ 1 ข้อ)<textarea id="stR" rows="6" maxlength="1900">' + esc(String(s.candRules || '').split('|').join('\n')) + '</textarea></label><label>จำนวนครั้งที่ผู้เข้าสอบกรอกรหัสผิดได้ก่อนพัก 5 นาที<input id="stL" type="number" min="3" max="30" value="' + esc(s.candFailLimit || 8) + '"></label>' +
+    '<div class="se-l">แบบประเมินความพึงพอใจ (แสดงหลังผู้เข้าสอบส่งครบทุกตอน)</div><label class="chk"><input type="checkbox" id="stSv"' + (s.surveyOn !== '0' ? ' checked' : '') + '> เปิดใช้แบบประเมิน (ไม่บังคับตอบ · ไม่ระบุตัวผู้ตอบ)</label><label>หัวข้อประเมิน บรรทัดละ 1 ข้อ ไม่เกิน 7 ข้อ (ให้คะแนน 1–5) · มีช่องข้อเสนอแนะต่อท้ายเสมอ<textarea id="stSi" rows="7" maxlength="1900">' + esc(String(s.surveyItems || '').split('|').join('\n')) + '</textarea></label>' +
+    '<button class="btn primary" id="stS">บันทึกการตั้งค่า</button></form></div>' +
     '<div class="card"><h2 class="card-t">ระบบและการเชื่อมต่อ</h2><table class="kv"><tr><th>รุ่นหน้าเว็บ</th><td>' + esc(TG_BUILD) + '</td></tr><tr><th>รุ่นหลังบ้าน</th><td>' + esc(d.app.build) + ' ' + (d.app.build === TG_BUILD ? '<span class="tag ok">ตรงกัน</span>' : '<span class="tag bad">ไม่ตรงกัน</span>') + '</td></tr><tr><th>ช่วงผ่อนผันหลังหมดเวลา</th><td>' + d.app.graceSec + ' วินาที</td></tr>' +
     '<tr><th>ฐานข้อมูล</th><td>' + (d.links.sheet ? '<a href="' + esc(d.links.sheet) + '" target="_blank" rel="noopener">เปิด Google Sheet</a>' : '–') + '</td></tr><tr><th>ไฟล์สอบ</th><td>' + (d.links.folder ? '<a href="' + esc(d.links.folder) + '" target="_blank" rel="noopener">เปิดโฟลเดอร์ Google Drive</a>' : '–') + '</td></tr>' +
-    '<tr><th>ระบบ HR (SmartAPI)</th><td>' + (d.smartApi ? '<span class="tag ok">ตั้งค่าแล้ว</span> <button class="btn link" id="stT">ทดสอบการเชื่อมต่อ</button>' : '<span class="tag">ยังไม่ได้เชื่อมต่อ</span><br><small class="muted">ไม่บังคับ — ใช้ดึงชื่อเจ้าหน้าที่จากเลขเจ้าหน้าที่ ตั้ง SMARTAPI_USER / SMARTAPI_PASS ใน Script Properties</small>') + '</td></tr></table>' +
+    '<tr><th>ระบบ HR (SmartAPI)</th><td>' + (d.smartApi ? '<span class="tag ok">ตั้งค่าแล้ว</span> <button class="btn link" id="stT">ทดสอบการเชื่อมต่อ</button>' : '<span class="tag">ยังไม่ได้เชื่อมต่อ</span><br><small class="muted">ไม่บังคับ — ใช้ดึงชื่อเจ้าหน้าที่จากเลขเจ้าหน้าที่ ตั้ง SMARTAPI_USER / SMARTAPI_PASS ใน Script Properties</small>') + '</td></tr>' +
+    '<tr><th>ชุดข้อสอบของรุ่นนี้</th><td><button class="btn link" id="stX">ตรวจและติดตั้งชุดข้อสอบที่ยังไม่มีในคลัง</button><br><small class="muted">ปกติระบบติดตั้งให้เองหลังอัปเดต · ไม่แตะข้อสอบเดิม</small></td></tr></table>' +
     '<p class="muted sm">Google Sheet และโฟลเดอร์ Drive เปิดได้เฉพาะเจ้าของบัญชีที่ติดตั้งระบบ ห้ามแชร์ให้ผู้อื่น เพราะมีเฉลยข้อสอบและรหัสเข้าสอบ</p></div></div>' +
+    '<div class="card"><h2 class="card-t">ทดสอบรับโหลด</h2><p class="card-s">จำลองผู้เข้าสอบหลายคนเข้าระบบ ทำข้อสอบ บันทึก ส่งคำตอบ และส่งไฟล์<b>พร้อมกัน</b>บนระบบจริง เพื่อวัดว่าระบบรับได้หรือไม่ · ใช้รอบสอบจำลองแยกต่างหาก ไม่กระทบข้อมูลจริง และลบทิ้งเองเมื่อจบ · <b>ห้ามรันระหว่างการสอบจริง</b></p>' +
+    '<div class="form ltform"><div class="row2"><label>คัดลอกตอนสอบจากรอบ<select id="ltE">' + d.exams.filter(function (e) { return e.examId !== 'LOADTEST'; }).map(function (e) { return '<option value="' + esc(e.examId) + '">' + esc(e.title) + '</option>'; }).join('') + '</select></label><label>จำนวนผู้เข้าสอบจำลอง<input id="ltN" type="number" min="1" max="40" value="25"></label></div><button class="btn primary" id="ltGo">เริ่มทดสอบรับโหลด</button></div><div id="ltOut"></div></div>' +
     '<div class="card"><div class="card-head"><div><h2 class="card-t">ประวัติการใช้งาน</h2><p class="card-s">300 รายการล่าสุด · ทุกการเข้าสู่ระบบ การส่งคำตอบ การให้คะแนน และการแก้ไขของผู้ดูแลถูกบันทึกไว้</p></div><input id="auQ" class="search" placeholder="ค้นหา เช่น resetSection, 5660101"></div><div class="tblwrap tall" id="auB"><p class="muted">กำลังโหลด…</p></div></div></div>';
-  $('#stF').onsubmit = function (e) { e.preventDefault(); var b = $('#stS'); busy(b, true); api('saveSettings', { settings: { orgName: val('stO'), contact: val('stC'), candRules: val('stR').split(/\n/).map(function (x) { return x.trim(); }).filter(String).join('|'), candFailLimit: val('stL') } }).then(function () { busy(b, false); toast('บันทึกแล้ว', 'ok'); AD.at = 0; }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); }); };
+  $('#stF').onsubmit = function (e) { e.preventDefault(); var b = $('#stS'); busy(b, true); api('saveSettings', { settings: { orgName: val('stO'), contact: val('stC'), candRules: val('stR').split(/\n/).map(function (x) { return x.trim(); }).filter(String).join('|'), candFailLimit: val('stL'), surveyOn: $('#stSv').checked ? '1' : '0', surveyItems: val('stSi').split(/\n/).map(function (x) { return x.trim(); }).filter(String).slice(0, 7).join('|') } }).then(function () { busy(b, false); toast('บันทึกแล้ว', 'ok'); AD.at = 0; }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); }); };
+  $('#stX').onclick = function () { var b = this; busy(b, true, 'กำลังตรวจ…'); api('installExtraSets', {}, { timeout: 120000 }).then(function (r) { busy(b, false); AD.at = 0; toast(r.sets ? 'ติดตั้งเพิ่ม ' + r.sets + ' ชุด ' + r.questions + ' ข้อ' : 'คลังข้อสอบมีครบทุกชุดของรุ่นนี้แล้ว', 'ok'); }).catch(function (e) { busy(b, false); toast(e.message, 'bad'); }); };
+  $('#ltGo').onclick = function () { loadTest(val('ltE'), Number(val('ltN')) || 25, this); };
   if ($('#stT')) $('#stT').onclick = function () { var b = this; busy(b, true, 'กำลังทดสอบ…'); api('testSmartApi', {}, { timeout: 60000 }).then(function (r) { busy(b, false); toast('เชื่อมต่อ SmartAPI ได้ (' + r.ms + ' ms)', 'ok'); }).catch(function (e) { busy(b, false); toast(e.message, 'bad'); }); };
   api('getAudit', { limit: 300 }).then(function (r) {
     function draw() { var q = val('auQ').toLowerCase(), rows = r.rows.filter(function (x) { return !q || (x.who + ' ' + x.action + ' ' + x.detail).toLowerCase().indexOf(q) >= 0; }); $('#auB').innerHTML = '<table class="tbl sm"><thead><tr><th>เวลา</th><th>ผู้ทำ</th><th>การกระทำ</th><th>รายละเอียด</th></tr></thead><tbody>' + rows.map(function (x) { return '<tr><td class="nowrap">' + tDate(x.at) + '</td><td>' + esc(x.who) + '</td><td><code>' + esc(x.action) + '</code></td><td>' + esc(x.detail) + '</td></tr>'; }).join('') + '</tbody></table>'; }
     if ($('#auB')) { draw(); $('#auQ').oninput = draw; }
   }).catch(function (e) { if ($('#auB')) $('#auB').textContent = e.message; });
+}
+
+/* ====================== ทดสอบรับโหลด (ผู้เข้าสอบจำลองทำข้อสอบพร้อมกันบนระบบจริง) ====================== */
+function loadTest(examId, n, btn) {
+  var out = $('#ltOut'), stat = [], t00 = performance.now(), doneU = 0, failU = 0, phase = 'เตรียมข้อมูลจำลอง';
+  var sleep = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  function call(action, payload, token) {
+    var rid = rid_(), t0 = performance.now(), tries = 0;
+    function once() {
+      tries++;
+      return fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, token: token, payload: payload || {}, rid: rid }), redirect: 'follow', credentials: 'omit' }).then(function (r) { return r.text(); }).then(function (t) {
+        var j = null; try { j = JSON.parse(t); } catch (e) { }
+        if (!j || j.rpc !== 1 || (!j.ok && j.busy)) { var x = new Error('soft'); x.soft = 1; throw x; }
+        if (!j.ok) { var er = new Error(j.error); er.hard = 1; throw er; }
+        return j.data;
+      }).catch(function (e) { if (e.hard) throw e; if (tries < 5) return sleep(700 * tries + Math.random() * 900).then(once); throw new Error('เชื่อมต่อไม่สำเร็จหลังลอง 5 ครั้ง'); });
+    }
+    return once().then(function (dd) { stat.push({ a: action, ms: performance.now() - t0, tries: tries, ok: true }); return dd; }, function (e) { stat.push({ a: action, ms: performance.now() - t0, tries: tries, ok: false, err: e.message }); throw e; });
+  }
+  function paint(final) {
+    var by = {}, order = ['loginCand', 'startSection', 'saveProgress', 'submitSection', 'getTemplate', 'uploadFile', 'submitSurvey'], TH2 = { loginCand: 'เข้าสู่ระบบ', startSection: 'เริ่มตอน (รับข้อสอบ)', saveProgress: 'บันทึกระหว่างทำ', submitSection: 'ส่งคำตอบ', getTemplate: 'ดาวน์โหลดไฟล์โจทย์', uploadFile: 'ส่งไฟล์คำตอบ', submitSurvey: 'ส่งแบบประเมิน' };
+    stat.forEach(function (x) { (by[x.a] = by[x.a] || []).push(x); });
+    var q = function (a, p) { var v = a.map(function (x) { return x.ms; }).sort(function (x, y) { return x - y; }); return v.length ? v[Math.min(v.length - 1, Math.floor(p * v.length))] / 1000 : 0; };
+    var fails = stat.filter(function (x) { return !x.ok; }), retr = stat.filter(function (x) { return x.tries > 1; }).length, sec = Math.round((performance.now() - t00) / 1000), worst = stat.length ? Math.max.apply(null, stat.map(function (x) { return x.ms; })) / 1000 : 0;
+    var verdict = !final ? '' : (failU === 0 && fails.length === 0 ? '<div class="note ok"><b>ผ่าน:</b> ผู้เข้าสอบจำลอง ' + n + ' คนทำครบทุกขั้นโดยไม่มีคำสั่งล้มเหลว' + (retr ? ' (มี ' + retr + ' คำสั่งที่ระบบต้องส่งซ้ำอัตโนมัติ ซึ่งผู้ใช้ไม่ต้องทำอะไร)' : '') + ' · คำสั่งที่ช้าที่สุดใช้ ' + num(worst, 1) + ' วินาที' + (worst > 30 ? ' — ช้ากว่าที่ควร แนะนำให้ผู้เข้าสอบเริ่มไม่พร้อมกันเป๊ะ (ทยอยกดเริ่ม) และเผื่อเวลา' : '') + '</div>'
+      : '<div class="note bad"><b>ไม่ผ่าน:</b> ทำครบ ' + doneU + ' จาก ' + n + ' คน · คำสั่งล้มเหลว ' + fails.length + ' ครั้ง — ตัวอย่าง: ' + esc((fails[0] || {}).err || '') + '</div>');
+    out.innerHTML = '<div class="ltbox"><p><b>' + (final ? 'ทดสอบเสร็จ' : '<i class="spin dark"></i> ' + esc(phase)) + '</b> · ผ่านไป ' + sec + ' วินาที · ทำครบ ' + doneU + '/' + n + ' คน · ส่งคำสั่งแล้ว ' + stat.length + ' ครั้ง</p>' + verdict +
+      '<div class="tblwrap"><table class="tbl sm"><thead><tr><th>ขั้นตอน</th><th class="r">จำนวน</th><th class="r">ค่ากลาง (วินาที)</th><th class="r">ช้าสุด 5% (วินาที)</th><th class="r">ช้าที่สุด</th><th class="r">ส่งซ้ำอัตโนมัติ</th><th class="r">ล้มเหลว</th></tr></thead><tbody>' +
+      order.filter(function (k) { return by[k]; }).map(function (k) { var a = by[k]; return '<tr><td>' + TH2[k] + '</td><td class="r">' + a.length + '</td><td class="r">' + num(q(a, .5), 1) + '</td><td class="r">' + num(q(a, .95), 1) + '</td><td class="r">' + num(q(a, 1), 1) + '</td><td class="r">' + a.filter(function (x) { return x.tries > 1; }).length + '</td><td class="r">' + (a.filter(function (x) { return !x.ok; }).length || '–') + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
+  }
+  function user(c, secs, i) {
+    var tok;
+    return sleep(Math.random() * 4000).then(function () { return call('loginCand', { examNo: c.examNo, code: c.code, ua: 'loadtest' }); }).then(function (r) {
+      tok = r.token;
+      return secs.reduce(function (p, s) {
+        return p.then(function () { return sleep(300 + Math.random() * 1500); }).then(function () { return call('startSection', { secId: s.secId }, tok); }).then(function (st) {
+          if (s.type === 'PRACTICAL') {
+            if (!s.hasTemplate) return call('submitSection', { secId: s.secId }, tok);
+            return call('getTemplate', { secId: s.secId }, tok).then(function (t) { return sleep(1500 + Math.random() * 2500).then(function () { return call('uploadFile', { secId: s.secId, name: 'loadtest_' + c.examNo + '.xlsx', b64: t.b64 }, tok); }); }).then(function () { return call('submitSection', { secId: s.secId }, tok); });
+          }
+          var ans = {}; st.questions.forEach(function (q) { ans[q.id] = q.type === 'ESSAY' ? 'คำตอบจำลองสำหรับทดสอบรับโหลด '.repeat(12) : 1 + Math.floor(Math.random() * (q.choices.length || 2)); });
+          var half = {}; Object.keys(ans).slice(0, Math.ceil(st.questions.length / 2)).forEach(function (k) { half[k] = ans[k]; });
+          return sleep(1500 + Math.random() * 2500).then(function () { return call('saveProgress', { secId: s.secId, answers: half, blur: 0 }, tok); })
+            .then(function () { return sleep(1500 + Math.random() * 2500); }).then(function () { return call('saveProgress', { secId: s.secId, answers: ans, blur: 0 }, tok); })
+            .then(function () { return sleep(500 + Math.random() * 1500); }).then(function () { return call('submitSection', { secId: s.secId, answers: ans, blur: 0 }, tok); });
+        });
+      }, Promise.resolve());
+    }).then(function (st) { if (st && st.survey && !st.survey.done) return call('submitSurvey', { scores: st.survey.items.map(function () { return 4 + Math.round(Math.random()); }), comment: '' }, tok); }).then(function () { doneU++; }, function () { failU++; });
+  }
+  confirmBox('ทดสอบรับโหลด', '<p>ระบบจะสร้างรอบสอบจำลองและผู้เข้าสอบจำลอง <b>' + n + ' คน</b> แล้วให้ทุกคนเข้าระบบ ทำ และส่งข้อสอบพร้อมกัน ใช้เวลาประมาณ 1–3 นาที</p><div class="note warn">ห้ามรันระหว่างการสอบจริง · เปิดหน้านี้ค้างไว้จนจบ</div>', 'เริ่มทดสอบ').then(function (y) {
+    if (!y) return;
+    busy(btn, true, 'กำลังทดสอบ…'); paint();
+    var iv = setInterval(function () { paint(); }, 1000);
+    api('loadTestStart', { examId: examId, n: n }, { quiet: true, timeout: 120000 }).then(function (r) {
+      phase = 'ผู้เข้าสอบจำลอง ' + r.cands.length + ' คนกำลังทำข้อสอบพร้อมกัน';
+      return Promise.all(r.cands.map(function (c, i) { return user(c, r.sections, i); }));
+    }).then(function () { phase = 'กำลังลบข้อมูลจำลอง'; return api('loadTestEnd', {}, { quiet: true, timeout: 120000 }); }).then(function () {
+      clearInterval(iv); busy(btn, false); paint(true); AD.at = 0; TG.home = null; toast('ทดสอบรับโหลดเสร็จ และลบข้อมูลจำลองแล้ว', 'ok');
+    }).catch(function (e) {
+      clearInterval(iv); busy(btn, false); paint(true); toast('ทดสอบไม่จบ: ' + e.message, 'bad', 9000);
+      api('loadTestEnd', {}, { quiet: true, timeout: 120000 }).catch(function () { });
+    });
+  });
 }

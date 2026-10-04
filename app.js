@@ -2,7 +2,7 @@
    SOMDEJ TalentGate · app.js — แกนกลาง · เข้าสู่ระบบ · ตัวช่วยที่ใช้ร่วมกัน
    BUILD ต้องตรงกัน 3 ที่: Config.gs · app.js (TG_BUILD) · version.json (+ ?v= ใน index.html)
    ===================================================================== */
-var TG_BUILD = '2569-10-03.1';
+var TG_BUILD = '2569-10-04.1';
 var TG = { boot: null, token: null, kind: null, me: null, home: null, state: null, offset: 0, view: null };
 
 /* ---------- ตัวช่วยทั่วไป ---------- */
@@ -96,44 +96,72 @@ function fileB64(file) {
   return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = function () { rej(new Error('อ่านไฟล์ไม่ได้ กรุณาปิดไฟล์ในโปรแกรม Excel ก่อน แล้วลองอีกครั้ง')); }; r.readAsDataURL(file); });
 }
 
-/* ---------- เรียกหลังบ้าน (ไม่ตั้ง Content-Type เพื่อไม่ให้เกิด preflight) · พร้อมกันไม่เกิน 4 ---------- */
-var _run = 0, _wait = [], _pending = 0, _pillT = null;
-function pill() {
-  clearTimeout(_pillT);
-  if (_pending > 0) _pillT = setTimeout(function () { if (_pending > 0) $('#netpill').hidden = false; }, 4000); else $('#netpill').hidden = true;
+/* ---------- เรียกหลังบ้าน (ไม่ตั้ง Content-Type เพื่อไม่ให้เกิด preflight) · พร้อมกันไม่เกิน 4 ----------
+   ทุกคำขอมีรหัส rid: ถ้าเครือข่าย/Google ตอบผิดพลาด หน้าเว็บจะส่งซ้ำด้วย rid เดิม หลังบ้านจะไม่ทำซ้ำ (คืนผลเดิม) จึงลองใหม่ได้อย่างปลอดภัยทุกคำสั่ง */
+var _run = 0, _wait = [], _busyAll = 0, _fg = [], _fgT = null;
+var ACT_TH = { loginCand: 'กำลังตรวจสอบรหัสเข้าสอบ', loginStaff: 'กำลังเข้าสู่ระบบ', changePassword: 'กำลังบันทึกรหัสผ่านใหม่', saveExam: 'กำลังบันทึกการตั้งค่ารอบสอบ', setExamStatus: 'กำลังเปลี่ยนสถานะรอบสอบ', setSectionOpen: 'กำลังบันทึก',
+  importCandidates: 'กำลังนำเข้ารายชื่อ', saveCandidate: 'กำลังบันทึกผู้เข้าสอบ', deleteCandidate: 'กำลังลบ', regenCodes: 'กำลังออกรหัสใหม่', resetSection: 'กำลังล้างตอน', extendTime: 'กำลังเพิ่มเวลา', rescore: 'กำลังตรวจคะแนนปรนัยใหม่',
+  saveSet: 'กำลังบันทึกชุดข้อสอบ', saveQuestion: 'กำลังบันทึกข้อสอบ', deleteQuestion: 'กำลังลบข้อสอบ', importQuestions: 'กำลังนำเข้าข้อสอบ', setQuestionsActive: 'กำลังบันทึกการเลือกข้อสอบ', installExtraSets: 'กำลังติดตั้งชุดข้อสอบ',
+  saveSettings: 'กำลังบันทึกการตั้งค่า', saveStaff: 'กำลังบันทึกเจ้าหน้าที่', savePosition: 'กำลังบันทึกตำแหน่ง', deletePosition: 'กำลังลบ', deleteExam: 'กำลังลบรอบสอบ', uploadTemplate: 'กำลังอัปโหลดไฟล์โจทย์', saveGrades: 'กำลังบันทึกคะแนน',
+  submitSurvey: 'กำลังส่งแบบประเมิน', setExamBlind: 'กำลังบันทึก', clearExamData: 'กำลังล้างข้อมูลซ้อมสอบ', loadTestStart: 'กำลังเตรียมข้อมูลจำลอง', loadTestEnd: 'กำลังลบข้อมูลจำลอง', lookupStaff: 'กำลังค้นหาในระบบ HR', testSmartApi: 'กำลังทดสอบการเชื่อมต่อ', logout: 'กำลังออกจากระบบ' };
+function rid_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6); }
+/** แถบความคืบหน้าด้านบน (ทุกคำขอ) + ป๊อปอัป "กำลังดำเนินการ" (คำสั่งที่ผู้ใช้กด) — ให้รู้ว่าระบบยังทำงาน ไม่ได้ค้าง */
+function waitUI() {
+  var bar = $('#netbar'), w = $('#waitbox'); if (!bar || !w) return;
+  bar.classList.toggle('on', _busyAll > 0);
+  if (!_fg.length) { w.hidden = true; w.classList.remove('show'); clearInterval(_fgT); _fgT = null; return; }
+  function paint() {
+    var f = _fg[0]; if (!f) return;
+    var sec = Math.floor((Date.now() - f.t0) / 1000);
+    if (sec < 1 && w.hidden && !f.now) return;   // คำสั่งที่เสร็จภายใน 1 วินาทีไม่ต้องขึ้นป๊อปอัป
+    if (w.hidden) { w.hidden = false; void w.offsetWidth; w.classList.add('show'); }
+    $('#waitT').textContent = f.label + '…';
+    $('#waitS').textContent = f.retry ? 'การเชื่อมต่อสะดุด กำลังลองใหม่ครั้งที่ ' + f.retry + ' — ไม่ต้องกดซ้ำ' : sec >= 8 ? 'เซิร์ฟเวอร์ตอบช้ากว่าปกติ ระบบยังทำงานอยู่ ไม่ได้ค้าง — ไม่ต้องกดซ้ำ' : 'ระบบกำลังทำงาน กรุณารอสักครู่';
+    $('#waitN').textContent = sec >= 2 ? 'ผ่านไป ' + sec + ' วินาที' : '';
+  }
+  paint(); if (!_fgT) _fgT = setInterval(paint, 250);
 }
 function api(action, payload, opt) {
   opt = opt || {};
-  var canRetry = /^(get|bootstrap|ping)/.test(action) || opt.retry, tries = canRetry ? (opt.tries || 3) : 1;
+  var read = /^(get|bootstrap|ping)/.test(action), tries = opt.tries || 4, rid = rid_(), token = TG.token;
+  var fg = !read && !opt.quiet ? { label: opt.label || ACT_TH[action] || 'กำลังดำเนินการ', t0: Date.now(), retry: 0 } : null;
+  function soft(msg) { var e = new Error(msg); e.soft = true; return e; }
   function once(n) {
     var ctl = new AbortController(), timer = setTimeout(function () { ctl.abort(); }, opt.timeout || 60000);
-    return fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, token: TG.token, payload: payload || {} }), redirect: 'follow', credentials: 'omit', signal: ctl.signal })
+    return fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: action, token: token, payload: payload || {}, rid: rid }), redirect: 'follow', credentials: 'omit', signal: ctl.signal })
       .then(function (r) { return r.text(); })
       .then(function (t) {
         clearTimeout(timer);
-        if (t.charAt(0) === '<') throw new Error('เซิร์ฟเวอร์ไม่ว่างชั่วคราว กรุณาลองใหม่อีกครั้ง');
-        var j = JSON.parse(t);
+        var j = null; try { j = JSON.parse(t); } catch (e) { }
+        // Google ตอบเป็นหน้า HTML หรือเปลี่ยนเส้นทางไปที่ doGet (ไม่มีเครื่องหมาย rpc) = ยังไม่ได้ผลของคำสั่งนี้ → ลองใหม่ด้วย rid เดิม
+        if (!j || j.rpc !== 1) throw soft('เซิร์ฟเวอร์ไม่ว่างชั่วคราว กรุณาลองใหม่อีกครั้ง');
+        if (!j.ok && j.busy) throw soft(j.error);
         if (!j.ok) { var e = new Error(j.error || 'เกิดข้อผิดพลาด'); e.server = true; e.auth = j.auth; e.mustChange = j.mustChange; throw e; }
         if (j.data && j.data.now) syncClock(j.data.now);
-        return j.data;
+        return j.data === undefined || j.data === null ? {} : j.data;
       })
       .catch(function (e) {
         clearTimeout(timer);
         if (e.server) throw e;
-        if (n < tries) return new Promise(function (res) { setTimeout(res, 1200 * n); }).then(function () { return once(n + 1); });
+        if (n < tries) { if (fg) fg.retry = n + 1; return new Promise(function (res) { setTimeout(res, 700 * n + Math.random() * 900); }).then(function () { return once(n + 1); }); }
+        if (e.soft) throw new Error(e.message);
         if (e.name === 'AbortError') throw new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
         if (/Failed to fetch|NetworkError|Load failed/i.test(e.message)) throw new Error('เชื่อมต่อระบบไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่');
         throw e;
       });
   }
+  if (fg) { _fg.push(fg); }
+  _busyAll++; waitUI();
   return new Promise(function (res, rej) {
+    function done() { _busyAll--; if (fg) { var i = _fg.indexOf(fg); if (i >= 0) _fg.splice(i, 1); } waitUI(); }
     function go() {
-      _run++; _pending++; pill();
-      once(1).then(res, function (e) {
+      _run++;
+      once(1).then(function (d) { done(); res(d); }, function (e) {
+        done();
         if (e.auth === false && TG.token && !opt.keepSession) authLost(e.message);
         else if (e.mustChange) { TG.me.mustChange = true; route(); }
         rej(e);
-      }).then(function () { _run--; _pending--; pill(); var f = _wait.shift(); if (f) f(); });
+      }).then(function () { _run--; var f = _wait.shift(); if (f) f(); });
     }
     if (_run < 4) go(); else _wait.push(go);
   });
@@ -174,7 +202,7 @@ function markNav() {
   $$('.nav a').forEach(function (a) { a.classList.toggle('active', a.dataset.nav === key); });
 }
 function logout() {
-  var t = TG.token; api('logout', {}, { keepSession: true }).catch(function () { });
+  var t = TG.token; api('logout', {}, { keepSession: true, quiet: true, tries: 1 }).catch(function () { });
   setSession(null); if (t) toast('ออกจากระบบแล้ว'); go('#/');
 }
 
@@ -191,8 +219,8 @@ function viewLogin(tab, msg) {
   sess('tg_tab', tab);
   var info = openInfo();
   $('#app').innerHTML =
-    '<section class="login"><div class="login-hero">' + gateArt() +
-    '<div class="hero-in"><span class="pill gold">ฝ่ายทรัพยากรบุคคล · HR Transformation</span><h1>SOMDEJ <em>TalentGate</em></h1>' +
+    '<section class="login"><div class="login-hero"><div class="hero-photo" aria-hidden="true"></div><div class="hero-veil" aria-hidden="true"></div><i class="orb o1" aria-hidden="true"></i><i class="orb o2" aria-hidden="true"></i>' + gateArt() +
+    '<div class="hero-in"><span class="pill gold">ฝ่ายทรัพยากรบุคคล · HR Transformation</span><h1><span class="w1">SOMDEJ</span> <em class="w2">TalentGate</em></h1>' +
     '<p class="hero-sub">ระบบสอบคัดเลือกบุคลากรออนไลน์<br>โรงพยาบาลสมเด็จพระบรมราชเทวี ณ ศรีราชา สภากาชาดไทย</p>' +
     '<ul class="hero-pts"><li>' + ICON.shield + 'โปร่งใส ตรวจสอบได้ทุกขั้นตอน</li><li>' + ICON.clock + 'จับเวลาและบันทึกคำตอบอัตโนมัติ</li><li>' + ICON.check + 'มาตรฐานเดียวกันทุกตำแหน่ง</li></ul><div id="lgOpen">' + info + '</div></div></div>' +
     '<div class="login-side"><div class="card login-card"><div class="seg" role="tablist"><button role="tab" data-t="cand" class="' + (tab === 'cand' ? 'on' : '') + '">' + ICON.user + 'ผู้เข้าสอบ</button><button role="tab" data-t="staff" class="' + (tab === 'staff' ? 'on' : '') + '">' + ICON.lock + 'กรรมการ / ผู้ดูแล</button></div>' +
@@ -211,7 +239,7 @@ function viewLogin(tab, msg) {
   conn();
   $('#lgF').onsubmit = function (e) {
     e.preventDefault(); var btn = $('#lgBtn'); busy(btn, true, 'กำลังตรวจสอบ…');
-    var p = tab === 'cand' ? api('loginCand', { examNo: $('#lgNo').value, code: $('#lgCode').value, ua: navigator.userAgent })
+    var p = tab === 'cand' ? api('loginCand', { examNo: $('#lgNo').value, code: $('#lgCode').value, ua: navigator.userAgent }, { tries: 5 })
       : api('loginStaff', { empCode: $('#lgEmp').value.trim(), password: $('#lgPass').value });
     p.then(function (r) {
       if (tab === 'cand') { TG.state = r.state; setSession({ token: r.token, kind: 'cand' }); go('#/exam'); }
@@ -261,7 +289,7 @@ function go(hash) { if (location.hash === hash) route(); else location.hash = ha
 function route() {
   var parts = location.hash.replace(/^#\/?/, '').split('/').filter(String).map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } });
   if (typeof candLeaving === 'function' && candLeaving(parts)) return;
-  closeModal(); window.scrollTo(0, 0);
+  closeModal(); window.scrollTo(0, 0); enterAnim();
   if (!TG.token) return viewLogin(parts[0] === 'staff' || parts[0] === 'admin' ? 'staff' : (sess('tg_tab') || 'cand'));
   if (TG.kind === 'cand') return candRoute(parts);
   if (TG.me.mustChange) return viewChangePass(true);
@@ -271,6 +299,20 @@ function route() {
   return viewStaffHome();
 }
 window.addEventListener('hashchange', route);
+/** แอนิเมชันเข้าหน้า: เล่นเฉพาะตอนเปลี่ยนหน้า (ไม่เล่นซ้ำตอนข้อมูลรีเฟรช) */
+function enterAnim() {
+  var b = document.body; b.classList.remove('enter'); void b.offsetWidth; b.classList.add('enter');
+  clearTimeout(enterAnim._t); enterAnim._t = setTimeout(function () { b.classList.remove('enter'); }, 1400);
+}
+/** ตัวเลขวิ่งขึ้น (เฉพาะช่วงแอนิเมชันเข้าหน้า) */
+function countUp(root) {
+  if (!document.body.classList.contains('enter') || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('[data-cu]', root).forEach(function (el) {
+    var to = Number(el.dataset.cu), dec = (String(el.dataset.cu).split('.')[1] || '').length, t0 = performance.now(), dur = 700;
+    if (!isFinite(to) || to === 0) return;
+    (function step(t) { var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = (to * e).toLocaleString('th-TH', { minimumFractionDigits: dec, maximumFractionDigits: dec }); if (k < 1) requestAnimationFrame(step); })(t0);
+  });
+}
 
 /* ---------- เริ่มต้น ---------- */
 function afterBoot() {
@@ -290,7 +332,7 @@ function checkVersion() {
   }
   var s = sess('tg_s');
   if (s && s.token) { TG.token = s.token; TG.kind = s.kind; TG.me = s.me; }
-  var bootP = api('bootstrap').then(function (b) { TG.boot = b; store('tg_boot', b); afterBoot(); }).catch(function (e) { if (!TG.boot) { var el = $('#lgConn'); if (el) { el.textContent = e.message; el.className = 'conn bad'; } } });
+  var bootP = api('bootstrap', {}, { tries: 5 }).then(function (b) { TG.boot = b; store('tg_boot', b); afterBoot(); }).catch(function (e) { if (!TG.boot) { var el = $('#lgConn'); if (el) { el.textContent = e.message; el.className = 'conn bad'; } } });
   var cached = store('tg_boot'); if (cached && !TG.boot) { TG.boot = cached; afterBoot(); }
   if (!TG.token) { route(); return; }
   var p = TG.kind === 'cand' ? api('getCandState').then(function (st) { TG.state = st; }) : (TG.me && TG.me.mustChange ? Promise.resolve() : api('getStaffHome').then(function (h) { TG.home = h; TG.me = h.me; }));

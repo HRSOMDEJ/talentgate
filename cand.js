@@ -37,7 +37,13 @@ function viewCandHome() {
     '<div class="idrow"><div class="idbox"><small>เลขประจำตัวสอบ</small><b>' + esc(no3(st.me.examNo)) + '</b></div><div class="idbox grow"><small>ชื่อ-สกุล</small><b>' + esc(st.me.name) + '</b></div></div>' +
     '<p class="muted sm">หากชื่อไม่ตรงกับท่าน โปรดแจ้งกรรมการคุมสอบทันที ก่อนเริ่มทำข้อสอบ</p></div>';
   if (done) {
-    h += '<div class="card done-card"><div class="done-mark">' + ICON.check + '</div><h2>ส่งคำตอบครบทุกตอนแล้ว</h2><p class="muted">ระบบบันทึกคำตอบของท่านเรียบร้อย ขอบคุณที่เข้าร่วมการสอบคัดเลือก<br>โรงพยาบาลจะประกาศผลตามช่องทางที่แจ้งไว้</p><button class="btn primary lg mt" id="cOut">ออกจากระบบ</button></div>';
+    var sv = st.survey && !st.survey.done ? st.survey : null;
+    h += '<div class="card done-card"><div class="confetti" aria-hidden="true">' + new Array(15).join('<i></i>') + '</div><div class="done-mark"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" fill="none"/><path d="M15 27l8 8 15-17" fill="none"/></svg></div><h2>ส่งคำตอบครบทุกตอนแล้ว</h2><p class="muted">ระบบบันทึกคำตอบของท่านเรียบร้อย ขอบคุณที่เข้าร่วมการสอบคัดเลือก<br>โรงพยาบาลจะประกาศผลตามช่องทางที่แจ้งไว้</p>' + (sv ? '' : (st.survey && st.survey.done ? '<p class="ok-t sm mt">ขอบคุณสำหรับแบบประเมินความพึงพอใจ</p>' : '') + '<button class="btn primary lg mt" id="cOut">ออกจากระบบ</button>') + '</div>';
+    if (sv) h += '<form class="card survey" id="svF"><span class="eyebrow">ใช้เวลาไม่เกิน 1 นาที</span><h2 class="card-t">แบบประเมินความพึงพอใจการใช้ระบบสอบออนไลน์</h2><p class="card-s">ไม่บังคับ · ไม่ระบุตัวผู้ตอบ · <b>ไม่มีผลต่อคะแนนสอบ</b> — ความเห็นของท่านช่วยให้ฝ่ายทรัพยากรบุคคลปรับปรุงระบบให้ดีขึ้น</p>' +
+      '<div class="sv-scale"><span>1 = น้อยที่สุด</span><span>5 = มากที่สุด</span></div>' + sv.items.map(function (t, i) {
+        return '<div class="sv-q" role="radiogroup" aria-label="' + esc(t) + '"><p><b>' + (i + 1) + '.</b> ' + esc(t) + '</p><div class="sv-r">' + [1, 2, 3, 4, 5].map(function (n) { return '<label><input type="radio" name="sv' + i + '" value="' + n + '"><span>' + n + '</span></label>'; }).join('') + '</div></div>';
+      }).join('') + '<label class="sv-c">ข้อเสนอแนะเพิ่มเติม (ถ้ามี)<textarea id="svC" rows="3" maxlength="1500" placeholder="สิ่งที่ชอบ สิ่งที่ควรปรับปรุง หรือปัญหาที่พบระหว่างสอบ"></textarea></label>' +
+      '<div class="modal-act"><button type="button" class="btn ghost-dark" id="cOut">ข้ามและออกจากระบบ</button><button class="btn primary" id="svS">ส่งแบบประเมิน</button></div></form>';
   } else if (st.exam.status !== 'OPEN') {
     h += '<div class="note warn">รอบสอบนี้ปิดรับคำตอบแล้ว หากมีข้อสงสัยโปรดติดต่อกรรมการคุมสอบ</div>';
   } else if (!agreed) {
@@ -59,6 +65,13 @@ function viewCandHome() {
   h += '</div>' + (st.contact ? '<p class="muted center sm mt">' + esc(st.contact) + '</p>' : '') + '</div>';
   $('#app').innerHTML = h;
   if ($('#cOut')) $('#cOut').onclick = logout;
+  if ($('#svF')) $('#svF').onsubmit = function (e) {
+    e.preventDefault();
+    var scores = st.survey.items.map(function (t, i) { var x = $('[name=sv' + i + ']:checked'); return x ? Number(x.value) : ''; }), cm = $('#svC').value.trim();
+    if (!cm && scores.every(function (v) { return v === ''; })) return toast('กรุณาให้คะแนนอย่างน้อย 1 ข้อ หรือเขียนข้อเสนอแนะ', 'warn');
+    var b = $('#svS'); busy(b, true, 'กำลังส่ง…');
+    api('submitSurvey', { scores: scores, comment: cm }).then(function () { st.survey.done = true; toast('ขอบคุณสำหรับความเห็นของท่าน', 'ok'); viewCandHome(); window.scrollTo(0, 0); }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); });
+  };
   var ag = $('#cAgree'); if (ag) { toggleStart(false); ag.onchange = function () { if (ag.checked) sess('tg_agree', agKey); else sess('tg_agree', null); toggleStart(ag.checked); }; }
   $$('[data-go]').forEach(function (b) { b.onclick = function () { location.hash = '#/exam/' + b.dataset.go; }; });
   $$('[data-start]').forEach(function (b) {
@@ -80,7 +93,7 @@ function flagTags(f) { return String(f || '').split(',').filter(String).map(func
 function viewSection(secId) {
   candStop(); TG.view = 'section';
   $('#app').innerHTML = '<div class="boot"><div class="boot-ring"></div><p>กำลังเตรียมข้อสอบ…</p></div>';
-  api('startSection', { secId: secId }, { retry: true, tries: 4 }).then(function (r) {
+  api('startSection', { secId: secId }, { quiet: true, tries: 5 }).then(function (r) {
     var s = r.section, d = store(draftKey(secId)) || {};
     CAND.sec = s; CAND.qs = r.questions; CAND.blur = Math.max(r.blur || 0, d.blur || 0); CAND.due = s.dueAt; CAND.lockClock = true;
     CAND.ans = Object.assign({}, r.answers || {}, d.ans || {}); CAND.marks = d.marks || {};
@@ -132,7 +145,7 @@ function saveNow() {
   if (!CAND.sec || CAND.submitting) return;
   if (CAND.sec.type === 'PRACTICAL' || !CAND.dirty || CAND.saving) { if (CAND.sec.type === 'PRACTICAL') pollDue(); return scheduleSave(); }
   CAND.saving = true; CAND.dirty = false; saveStatus();
-  api('saveProgress', { secId: CAND.sec.secId, answers: CAND.ans, blur: CAND.blur }, { retry: true, tries: 2, timeout: 45000 }).then(function (r) {
+  api('saveProgress', { secId: CAND.sec.secId, answers: CAND.ans, blur: CAND.blur }, { quiet: true, tries: 2, timeout: 45000 }).then(function (r) {
     CAND.saving = false; CAND._pre = 0;
     if (r.done) { finishLocal(); return; }
     if (r.late) { if (!CAND.submitting) autoSubmit(); return; }
@@ -210,8 +223,10 @@ function askSubmit() {
 }
 function doSubmit(n) {
   n = n || 1; CAND.submitting = true; clearTimeout(CAND.saver);
+  if (CAND.saving && (CAND._sw = (CAND._sw || 0) + 1) < 40) return setTimeout(function () { doSubmit(n); }, 500);   // รอให้การบันทึกที่ค้างอยู่จบก่อน (ไม่เกิน 20 วินาที) กันเขียนทับกัน
+  CAND._sw = 0;
   var s = CAND.sec, p = { secId: s.secId, blur: CAND.blur }; if (s.type !== 'PRACTICAL') p.answers = CAND.ans;
-  api('submitSection', p, { retry: true, tries: 3, timeout: 90000 }).then(function (st) { TG.state = st; finishLocal(true); })
+  api('submitSection', p, { quiet: true, tries: 4, timeout: 90000 }).then(function (st) { TG.state = st; finishLocal(true); })
     .catch(function (e) {
       var m = $('#asMsg'); if (m) m.innerHTML = 'ยังส่งไม่สำเร็จ (' + esc(e.message) + ')<br>ระบบกำลังลองใหม่ครั้งที่ ' + (n + 1) + ' — คำตอบของท่านยังอยู่ในเครื่องนี้ <b>อย่าปิดหน้านี้</b> และแจ้งกรรมการคุมสอบ';
       if (CAND.sec) setTimeout(function () { doSubmit(n + 1); }, Math.min(20000, 5000 + n * 3000));
@@ -219,7 +234,7 @@ function doSubmit(n) {
 }
 function finishLocal(sent) {
   var s = CAND.sec; if (s) store(draftKey(s.secId), null);
-  candStop(); closeModal(); history.replaceState(null, '', '#/exam');
+  candStop(); closeModal(); history.replaceState(null, '', '#/exam'); enterAnim();
   if (sent) toast('ส่งคำตอบเรียบร้อย', 'ok');
   if (!sent || !TG.state) api('getCandState').then(function (st) { TG.state = st; viewCandHome(); }).catch(function () { viewCandHome(); }); else viewCandHome();
   window.scrollTo(0, 0);
@@ -239,7 +254,7 @@ function renderPractical() {
   pStat();
   $('#pGet').onclick = function () {
     var b = this; busy(b, true, 'กำลังเตรียมไฟล์…');
-    api('getTemplate', { secId: s.secId }, { retry: true, timeout: 90000 }).then(function (r) { saveBlob(r.name, b64Blob(r.b64, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')); busy(b, false); toast('ดาวน์โหลดไฟล์โจทย์แล้ว เปิดไฟล์จากโฟลเดอร์ Downloads', 'ok', 6000); })
+    api('getTemplate', { secId: s.secId }, { tries: 4, timeout: 90000 }).then(function (r) { saveBlob(r.name, b64Blob(r.b64, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')); busy(b, false); toast('ดาวน์โหลดไฟล์โจทย์แล้ว เปิดไฟล์จากโฟลเดอร์ Downloads', 'ok', 6000); })
       .catch(function (e) { busy(b, false); toast(e.message, 'bad'); });
   };
   var drop = $('#pDrop'), inp = $('#pFile');
@@ -270,7 +285,7 @@ function upload(f) {
   if (f.size < 2000) return pStat('ไฟล์นี้ว่างเปล่า กรุณาตรวจว่าบันทึกงานแล้ว', 'bad');
   CAND.uploading = true; pStat('<i class="spin dark"></i> กำลังส่งไฟล์ <b>' + esc(f.name) + '</b> … อย่าปิดหน้านี้');
   var sid = CAND.sec.secId;
-  fileB64(f).then(function (b64) { return api('uploadFile', { secId: sid, name: f.name, b64: b64 }, { retry: true, tries: 2, timeout: 180000 }); }).then(function (r) {
+  fileB64(f).then(function (b64) { return api('uploadFile', { secId: sid, name: f.name, b64: b64 }, { quiet: true, tries: 3, timeout: 180000 }); }).then(function (r) {
     CAND.uploading = false; if (!CAND.sec) return;
     CAND.sec.fileName = r.fileName; CAND.sec.fileAt = r.fileAt; CAND.sec.same = r.same; pStat();
     toast(r.same ? 'ไฟล์นี้เหมือนไฟล์โจทย์ต้นฉบับ โปรดตรวจสอบ' : 'ระบบได้รับไฟล์คำตอบแล้ว', r.same ? 'bad' : 'ok', 6000);
