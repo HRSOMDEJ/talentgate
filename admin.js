@@ -36,7 +36,7 @@ function newExamModal() {
           { type: 'THEORY', title: 'ตอนที่ 2 ภาคทฤษฎี', minutes: 50, shuffle: true, sets: c.filter(function (s) { return s.qtype === 'MCQ'; }).map(function (s) { return s.setId; }), instructions: 'เลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว ไม่อนุญาตให้ใช้อุปกรณ์สื่อสารหรือเครื่องมือ AI' }].filter(function (s) { return s.sets.length; });
       }
       busy($('#neS', b), true);
-      api('saveExam', { exam: { posId: val('nePos', b), title: val('neT', b), examDate: val('neD', b), place: val('neP', b), passPct: src ? src.passPct : 60, blind: src ? src.blind : true, committee: src ? src.committee : [] }, sections: secs })
+      api('saveExam', { exam: { posId: val('nePos', b), title: val('neT', b), examDate: val('neD', b), place: val('neP', b), passPct: src ? src.passPct : 60, blind: src ? src.blind : true, committee: src ? src.committee : [], ivOn: src ? src.ivOn : true, ivWeight: src ? src.ivWeight : 50, ivItems: src ? src.ivItems.map(function (x) { return { label: x.label, max: x.max }; }) : undefined }, sections: secs })
         .then(function (r) { AD.at = 0; TG.home = null; closeModal(); toast('สร้างรอบสอบแล้ว', 'ok'); location.hash = '#/staff/' + encodeURIComponent(r.examId) + '/setup'; })
         .catch(function (e) { busy($('#neS', b), false); toast(e.message, 'bad'); });
     };
@@ -67,6 +67,11 @@ function tabSetup() {
         '<label>หมายเหตุ<input id="sxN" maxlength="500" value="' + esc(ex.note) + '"></label><label class="chk"><input type="checkbox" id="sxBlind"' + (ex.blind ? ' checked' : '') + '> ปิดชื่อผู้เข้าสอบในหน้าตรวจ (เห็นเฉพาะเลขประจำตัวสอบ) — ไม่ติ๊ก = แสดงชื่อ-สกุลให้กรรมการเห็นขณะตรวจ · สลับได้จากสวิตช์ในแท็บตรวจเช่นกัน</label></div></div>' +
         '<div class="card"><h2 class="card-t">คณะกรรมการสอบรอบนี้</h2><p class="card-s">กรรมการเห็นและให้คะแนนได้เฉพาะรอบสอบที่ได้รับแต่งตั้ง · เพิ่มรายชื่อเจ้าหน้าที่ได้ที่เมนู "เจ้าหน้าที่"</p><div class="setgrp">' +
         staff.map(function (u) { return '<label class="setchip"><input type="checkbox" class="sx-cm" value="' + esc(u.empCode) + '"' + (ex.committee.indexOf(u.empCode) >= 0 ? ' checked' : '') + '><span><b>' + esc(u.name) + '</b><i>' + esc(u.empCode) + (u.roles.indexOf('ADMIN') >= 0 ? ' · ผู้ดูแล' : '') + '</i></span></label>'; }).join('') + '</div></div>' +
+        '<div class="card ivset"><div class="card-head"><div><h2 class="card-t">การสอบสัมภาษณ์</h2><p class="card-s">กรรมการให้คะแนนสัมภาษณ์ในแท็บ "สัมภาษณ์" · คะแนนรวม = คะแนนสอบ × น้ำหนักสอบ + คะแนนสัมภาษณ์ × น้ำหนักสัมภาษณ์ (คิดเป็นร้อยละ เต็ม 100) · เกณฑ์ผ่านด้านบนใช้กับคะแนนรวม</p></div><label class="sw"><input type="checkbox" id="sxIv"' + (ex.ivOn ? ' checked' : '') + (ro ? ' disabled' : '') + '><i></i></label></div>' +
+        (ex.ivOn ? '<div class="form"><div class="row2"><label>น้ำหนักคะแนนสัมภาษณ์ (ร้อยละ)<input id="sxIvW" type="number" min="0" max="100" step="1" value="' + ex.ivWeight + '"' + (ro ? ' disabled' : '') + '></label><div class="ivw"><span>สัดส่วนที่ใช้คิดคะแนนรวม</span><b id="sxIvT">สอบ ' + (100 - ex.ivWeight) + ' : สัมภาษณ์ ' + ex.ivWeight + '</b><div class="bar big"><i id="sxIvB" style="width:' + (100 - ex.ivWeight) + '%"></i></div></div></div>' +
+          '<div class="se-l">หัวข้อให้คะแนนสัมภาษณ์ — รวม ' + ex.ivItems.reduce(function (a, x) { return a + (Number(x.max) || 0); }, 0) + ' คะแนน' + (ex.ivLocked ? ' <span class="tag warn">มีคะแนนแล้ว: แก้ได้เฉพาะชื่อหัวข้อ</span>' : '') + '</div><table class="tbl rub-e ivi-e"><thead><tr><th>หัวข้อ</th><th class="r">คะแนนเต็ม</th><th></th></tr></thead><tbody>' +
+          ex.ivItems.map(function (x, j) { return '<tr data-j="' + j + '"><td><input data-iv="label" maxlength="80" value="' + esc(x.label) + '"' + (ro ? ' disabled' : '') + '></td><td class="r"><input data-iv="max" type="number" min="1" max="100" step="1" value="' + x.max + '"' + (ro || ex.ivLocked ? ' disabled' : '') + '></td><td>' + (ro || ex.ivLocked ? '' : '<button class="icon-btn dark" data-ivr="' + j + '" title="ลบหัวข้อ">×</button>') + '</td></tr>'; }).join('') +
+          '</tbody></table>' + (ro || ex.ivLocked ? '' : '<button class="btn link" id="sxIvA">' + ICON.plus + 'เพิ่มหัวข้อ</button>') + '</div>' : '<p class="muted sm">รอบนี้ไม่ใช้การสัมภาษณ์ในระบบ: ผลสอบคิดจากคะแนนสอบอย่างเดียว</p>') + '</div>' +
         '<div class="card-head"><h2 class="sec-h">ตอนสอบ <small class="muted">รวม ' + mins + ' นาที · ' + total + ' คะแนน</small></h2>' + (ro || lock ? '' : '<button class="btn ghost-dark sm" id="sxAdd">' + ICON.plus + 'เพิ่มตอน</button>') + '</div>';
       secs.forEach(function (s, i) {
         h += '<div class="card secedit" data-i="' + i + '"><div class="se-h"><span class="se-n">' + (i + 1) + '</span><input class="se-t" data-f="title" maxlength="160" value="' + esc(s.title) + '" placeholder="ชื่อตอน">' +
@@ -92,6 +97,9 @@ function tabSetup() {
       });
       ex.title = val('sxT'); ex.posId = val('sxPos'); ex.passPct = Number(val('sxPass')); ex.examDate = val('sxD'); ex.place = val('sxP'); ex.note = val('sxN'); ex.blind = $('#sxBlind').checked;
       ex.committee = $$('.sx-cm').filter(function (x) { return x.checked; }).map(function (x) { return x.value; });
+      if ($('#sxIv')) ex.ivOn = $('#sxIv').checked;
+      if ($('#sxIvW')) ex.ivWeight = Math.max(0, Math.min(100, Number(val('sxIvW')) || 0));
+      $$('.ivi-e tbody tr').forEach(function (tr) { var x = ex.ivItems[+tr.dataset.j]; $$('[data-iv]', tr).forEach(function (el) { x[el.dataset.iv] = el.dataset.iv === 'max' ? Number(el.value) : el.value; }); });
     }
     function bind() {
       $$('.secedit').forEach(function (card) {
@@ -108,6 +116,11 @@ function tabSetup() {
           toast('กำลังอัปโหลดไฟล์โจทย์…'); fileB64(f).then(function (b64) { return api('uploadTemplate', { secId: tp.dataset.tpl, name: f.name, b64: b64 }, { timeout: 180000 }); }).then(function () { toast('อัปโหลดไฟล์โจทย์แล้ว', 'ok'); s.hasTemplate = true; s.tplName = f.name; AD.at = 0; BD.at = 0; pull(); draw(); }).catch(function (e) { toast(e.message, 'bad'); });
         };
       });
+      if ($('#sxIv')) $('#sxIv').onchange = function () { pull(); draw(); };
+      if ($('#sxIvW')) $('#sxIvW').oninput = function () { var w = Math.max(0, Math.min(100, Number(this.value) || 0)); $('#sxIvT').textContent = 'สอบ ' + (100 - w) + ' : สัมภาษณ์ ' + w; $('#sxIvB').style.width = (100 - w) + '%'; };
+      $$('[data-ivr]').forEach(function (b) { b.onclick = function () { pull(); ex.ivItems.splice(+b.dataset.ivr, 1); draw(); }; });
+      $$('.ivi-e [data-iv=max]').forEach(function (x) { x.onchange = function () { pull(); draw(); }; });
+      if ($('#sxIvA')) $('#sxIvA').onclick = function () { pull(); ex.ivItems.push({ label: '', max: 10 }); draw(); };
       if ($('#sxAdd')) $('#sxAdd').onclick = function () { pull(); secs.push({ type: 'THEORY', title: 'ตอนที่ ' + (secs.length + 1), minutes: 30, sets: [], shuffle: true, instructions: '', rubric: [] }); draw(); };
       if ($('#sxSave')) $('#sxSave').onclick = function () {
         pull(); var b = this; busy(b, true, 'กำลังบันทึก…');
@@ -126,11 +139,11 @@ function tabCands() {
   function draw() {
     var r = AD.cands, list = r.candidates, act = list.filter(function (c) { return c.status === 'ACTIVE'; }).length;
     var h = '<div class="card"><div class="card-head"><div><h2 class="card-t">รายชื่อผู้เข้าสอบ</h2><p class="card-s">ทั้งหมด ' + list.length + ' คน · มีสิทธิ์สอบ ' + act + ' คน · รหัสเข้าสอบ 6 หลักใช้ได้เฉพาะรอบนี้และเฉพาะช่วงที่สถานะเป็น "เปิดสอบ"</p></div><div class="acts">' +
-      (ro ? '' : '<button class="btn primary sm" id="cdImp">นำเข้ารายชื่อ</button><button class="btn ghost-dark sm" id="cdAdd">' + ICON.plus + 'เพิ่มรายคน</button>') + '<button class="btn ghost-dark sm" id="cdShow">' + (AD.showCodes ? 'ซ่อนรหัส' : 'แสดงรหัส') + '</button><button class="btn ghost-dark sm" id="cdPrint">' + ICON.print + 'พิมพ์ใบรหัสเข้าสอบ</button><button class="btn ghost-dark sm" id="cdCheck">' + ICON.print + 'พิมพ์ใบลงชื่อ</button>' +
+      (ro ? '' : '<button class="btn primary sm" id="cdImp">นำเข้ารายชื่อ</button><button class="btn ghost-dark sm" id="cdAdd">' + ICON.plus + 'เพิ่มรายคน</button>') + '<button class="btn ghost-dark sm" id="cdShow">' + (AD.showCodes ? 'ซ่อนรหัส' : 'แสดงรหัส') + '</button><button class="btn ghost-dark sm" id="cdPrint">' + ICON.print + 'พิมพ์ใบรหัสเข้าสอบ</button><button class="btn ghost-dark sm" id="cdCheck">' + ICON.print + 'พิมพ์ใบลงชื่อ</button>' + (ro ? '' : '<button class="btn ghost-dark sm" id="cdDocs">' + ICON.up + 'อัปโหลดเอกสารหลายคน</button>') +
       (ro ? '' : '<button class="btn ghost-dark sm" id="cdRegen">ออกรหัสใหม่ทั้งรอบ</button>') + '</div></div>';
     if (!list.length) h += '<div class="empty"><h3>ยังไม่มีรายชื่อ</h3><p class="muted">กด "นำเข้ารายชื่อ" แล้ววางรายชื่อจาก Excel (เลขประจำตัวสอบ และชื่อ-สกุล)</p></div>';
-    else h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>เลขประจำตัวสอบ</th><th>ชื่อ-สกุล</th><th>รหัสเข้าสอบ</th><th>สถานะ</th><th>หมายเหตุ</th><th>เข้าระบบล่าสุด</th><th></th></tr></thead><tbody>' + list.map(function (c) {
-      return '<tr data-no="' + esc(c.examNo) + '" class="' + (c.status !== 'ACTIVE' ? 'off' : '') + '"><td><b class="cno">' + esc(no3(c.examNo)) + '</b></td><td>' + esc(c.name) + '</td><td><code class="code">' + (AD.showCodes ? esc(c.code) : '••••••') + '</code></td><td><select class="cd-st"' + (ro ? ' disabled' : '') + '>' + Object.keys(CS_TH).map(function (k) { return '<option value="' + k + '"' + (c.status === k ? ' selected' : '') + '>' + CS_TH[k] + '</option>'; }).join('') + '</select></td><td>' + esc(c.note) + '</td><td>' + (c.lastLogin ? tDate(c.lastLogin) : '<span class="muted">–</span>') + '</td><td class="nowrap">' +
+    else h += '<div class="tblwrap"><table class="tbl"><thead><tr><th>เลขประจำตัวสอบ</th><th>ชื่อ-สกุล</th><th>รหัสเข้าสอบ</th><th>สถานะ</th><th>เอกสาร</th><th>หมายเหตุ</th><th>เข้าระบบล่าสุด</th><th></th></tr></thead><tbody>' + list.map(function (c) {
+      return '<tr data-no="' + esc(c.examNo) + '" class="' + (c.status !== 'ACTIVE' ? 'off' : '') + '"><td><b class="cno">' + esc(no3(c.examNo)) + '</b></td><td>' + esc(c.name) + '</td><td><code class="code">' + (AD.showCodes ? esc(c.code) : '••••••') + '</code></td><td><select class="cd-st"' + (ro ? ' disabled' : '') + '>' + Object.keys(CS_TH).map(function (k) { return '<option value="' + k + '"' + (c.status === k ? ' selected' : '') + '>' + CS_TH[k] + '</option>'; }).join('') + '</select>' + (c.iv ? '<span class="tag info">สัมภาษณ์</span>' : '') + '</td><td class="nowrap"><button class="btn link cd-doc">' + (c.nDocs ? c.nDocs + ' ไฟล์' : 'เพิ่ม') + '</button></td><td>' + esc(c.note) + '</td><td>' + (c.lastLogin ? tDate(c.lastLogin) : '<span class="muted">–</span>') + '</td><td class="nowrap">' +
         (ro ? '' : '<button class="btn link cd-ed">แก้ไข</button><button class="btn link cd-rg">รหัสใหม่</button>' + (c.hasAttempts ? '' : '<button class="btn link danger-t cd-del">ลบ</button>')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
     $('#tab').innerHTML = h + '</div><div id="printArea"></div>';
@@ -139,11 +152,13 @@ function tabCands() {
     $('#cdPrint').onclick = function () { printSlips(r); };
     $('#cdCheck').onclick = function () { printSignSheet(r); };
     if ($('#cdImp')) $('#cdImp').onclick = importBox;
+    if ($('#cdDocs')) $('#cdDocs').onclick = function () { docsBulkBox(function () { if (BD.tab === 'cands') load(); }); };
     if ($('#cdAdd')) $('#cdAdd').onclick = function () { editBox(null); };
     if ($('#cdRegen')) $('#cdRegen').onclick = function () { askPass('ออกรหัสเข้าสอบใหม่ทั้งรอบ', '<div class="note bad">รหัสเดิมของทุกคนจะใช้ไม่ได้ ต้องพิมพ์ใบรหัสใหม่ทั้งหมด และผู้ที่เข้าระบบอยู่จะถูกออกจากระบบ</div>', 'ออกรหัสใหม่').then(function (x) { if (x) api('regenCodes', { examId: BD.id, password: x.password }).then(function (q) { toast('ออกรหัสใหม่ ' + q.n + ' คน', 'ok'); load(); }).catch(function (e) { toast(e.message, 'bad'); }); }); };
     $$('tr[data-no]').forEach(function (tr) {
       var c = find(tr.dataset.no), st = $('.cd-st', tr);
       st.onchange = function () { api('saveCandidate', { examId: BD.id, examNo: c.examNo, name: c.name, status: st.value, note: c.note }).then(function () { toast('เปลี่ยนสถานะเป็น "' + CS_TH[st.value] + '" แล้ว', 'ok'); BD.at = 0; load(); }).catch(function (e) { st.value = c.status; toast(e.message, 'bad'); }); };
+      $('.cd-doc', tr).onclick = function () { docsBox(c.examNo, function () { if (BD.tab === 'cands') load(); }); };
       if ($('.cd-ed', tr)) $('.cd-ed', tr).onclick = function () { editBox(c); };
       if ($('.cd-rg', tr)) $('.cd-rg', tr).onclick = function () { askPass('ออกรหัสใหม่ของเลขประจำตัวสอบ ' + no3(c.examNo), '<p>รหัสเดิมจะใช้ไม่ได้ทันที ใช้เมื่อผู้เข้าสอบทำใบรหัสหายหรือสงสัยว่ารหัสรั่วไหล</p>', 'ออกรหัสใหม่').then(function (x) { if (x) api('regenCodes', { examId: BD.id, examNo: c.examNo, password: x.password }).then(function () { AD.showCodes = true; toast('ออกรหัสใหม่แล้ว', 'ok'); load(); }).catch(function (e) { toast(e.message, 'bad'); }); }); };
       if ($('.cd-del', tr)) $('.cd-del', tr).onclick = function () { confirmBox('ลบผู้เข้าสอบ', '<p>ลบเลขประจำตัวสอบ ' + esc(no3(c.examNo)) + ' ' + esc(c.name) + ' ออกจากรอบนี้</p>', 'ลบ', true).then(function (y) { if (y) api('deleteCandidate', { examId: BD.id, examNo: c.examNo }).then(function () { toast('ลบแล้ว', 'ok'); BD.at = 0; load(); }).catch(function (e) { toast(e.message, 'bad'); }); }); };
@@ -181,11 +196,10 @@ function tabCands() {
   if (AD.cands && AD.cands.exam.examId === BD.id) draw(); else $('#tab').innerHTML = '<div class="boot"><div class="boot-ring"></div></div>';
   load();
 }
-function printDoc(html) { var p = $('#printArea'); p.innerHTML = html; document.body.classList.add('printing'); setTimeout(function () { window.print(); setTimeout(function () { document.body.classList.remove('printing'); p.innerHTML = ''; }, 500); }, 80); }
 function printSlips(r) {
   var url = location.origin + location.pathname, list = r.candidates.filter(function (c) { return c.status === 'ACTIVE'; });
   if (!list.length) return toast('ไม่มีผู้มีสิทธิ์สอบ', 'bad');
-  printDoc('<div class="slips">' + list.map(function (c) {
+  printLogged('ใบรหัสเข้าสอบ ' + list.length + ' คน', '<div class="slips">' + list.map(function (c) {
     return '<div class="slip"><div class="slip-h"><b>SOMDEJ TalentGate</b><span>ใบรหัสเข้าสอบ</span></div><p class="slip-e">' + esc(r.exam.title) + '</p><p class="slip-d">' + esc(r.exam.examDate) + (r.exam.place ? ' · ' + esc(r.exam.place) : '') + '</p>' +
       '<div class="slip-r"><div><small>เลขประจำตัวสอบ</small><b>' + esc(no3(c.examNo)) + '</b></div><div><small>รหัสเข้าสอบ</small><b class="mono">' + esc(c.code.replace(/(\d{3})(\d{3})/, '$1 $2')) + '</b></div></div><p class="slip-n">' + esc(c.name) + '</p>' +
       '<p class="slip-u">เข้าสอบที่ <b>' + esc(url.replace(/^https?:\/\//, '')) + '</b> › ผู้เข้าสอบ</p><p class="slip-w">ห้ามเปิดเผยรหัสนี้แก่ผู้อื่น · รหัสใช้ได้เฉพาะในวันสอบ · โปรดคืนใบนี้แก่กรรมการเมื่อสอบเสร็จ</p></div>';
@@ -193,7 +207,7 @@ function printSlips(r) {
 }
 function printSignSheet(r) {
   var list = r.candidates.filter(function (c) { return c.status === 'ACTIVE'; });
-  printDoc('<div class="sheet"><h2>ใบลงชื่อผู้เข้าสอบ</h2><p>' + esc(r.exam.title) + '<br>' + esc(r.exam.examDate) + (r.exam.place ? ' · ' + esc(r.exam.place) : '') + '</p><table><thead><tr><th>เลขประจำตัวสอบ</th><th>ชื่อ-สกุล</th><th>ลงชื่อเข้าสอบ</th><th>รับใบรหัส</th><th>หมายเหตุ</th></tr></thead><tbody>' +
+  printLogged('ใบลงชื่อผู้เข้าสอบ', '<div class="sheet"><h2>ใบลงชื่อผู้เข้าสอบ</h2><p>' + esc(r.exam.title) + '<br>' + esc(r.exam.examDate) + (r.exam.place ? ' · ' + esc(r.exam.place) : '') + '</p><table><thead><tr><th>เลขประจำตัวสอบ</th><th>ชื่อ-สกุล</th><th>ลงชื่อเข้าสอบ</th><th>รับใบรหัส</th><th>หมายเหตุ</th></tr></thead><tbody>' +
     list.map(function (c) { return '<tr><td class="c">' + esc(no3(c.examNo)) + '</td><td>' + esc(c.name) + '</td><td></td><td></td><td></td></tr>'; }).join('') + '</tbody></table><p class="sign">ลงชื่อ ............................................................ กรรมการคุมสอบ</p></div>');
 }
 
@@ -457,20 +471,32 @@ function viewPositions() {
 /* ====================== เจ้าหน้าที่ (ผู้ดูแล / กรรมการ) ====================== */
 function viewPeople() {
   var d = AD.data;
-  $('#app').innerHTML = '<div class="wrap"><div class="phead"><div><span class="eyebrow">ผู้ดูแลระบบ</span><h1>เจ้าหน้าที่ในระบบ</h1><p class="muted">กำหนดผู้ดูแลระบบและกรรมการสอบ · เข้าระบบด้วยเลขเจ้าหน้าที่ ครั้งแรกใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน แล้วระบบบังคับให้ตั้งรหัสใหม่ (ระบบไม่เก็บเลขประจำตัวประชาชน เก็บเฉพาะค่าที่เข้ารหัสทางเดียว)</p></div><button class="btn primary" id="plNew">' + ICON.plus + 'เพิ่มเจ้าหน้าที่</button></div><div class="card"><div class="tblwrap"><table class="tbl"><thead><tr><th>เลขเจ้าหน้าที่</th><th>ชื่อ-สกุล</th><th>หน่วยงาน</th><th>บทบาท</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th></th></tr></thead><tbody>' +
+  $('#app').innerHTML = '<div class="wrap"><div class="phead"><div><span class="eyebrow">ผู้ดูแลระบบ</span><h1>เจ้าหน้าที่ในระบบ</h1><p class="muted">กำหนดผู้ดูแลระบบและกรรมการสอบ · เข้าระบบด้วยเลขเจ้าหน้าที่ · เมื่อเพิ่มเจ้าหน้าที่ ระบบจะ<b>สุ่มรหัสผ่านชั่วคราว</b>ให้ (แสดงครั้งเดียว) และบังคับให้ตั้งรหัสผ่านของตนเองเมื่อเข้าครั้งแรก · ระบบเก็บเฉพาะค่าที่เข้ารหัสทางเดียว</p></div><button class="btn primary" id="plNew">' + ICON.plus + 'เพิ่มเจ้าหน้าที่</button></div><div class="card"><div class="tblwrap"><table class="tbl"><thead><tr><th>เลขเจ้าหน้าที่</th><th>ชื่อ-สกุล</th><th>หน่วยงาน</th><th>บทบาท</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th></th></tr></thead><tbody>' +
     d.staff.map(function (u) { return '<tr data-id="' + esc(u.empCode) + '" class="' + (u.active ? '' : 'off') + '"><td><b>' + esc(u.empCode) + '</b></td><td>' + esc(u.name) + '</td><td>' + esc(u.unit) + '</td><td>' + (u.roles.indexOf('ADMIN') >= 0 ? '<span class="tag info">ผู้ดูแลระบบ</span>' : '') + (u.roles.indexOf('COMMITTEE') >= 0 ? '<span class="tag">กรรมการสอบ</span>' : '') + '</td><td>' + (u.active ? (u.mustChange ? '<span class="tag warn">รอตั้งรหัสผ่าน</span>' : '<span class="tag ok">ใช้งาน</span>') : '<span class="tag">ปิดใช้งาน</span>') + '</td><td>' + (u.lastLogin ? tDate(u.lastLogin) : '<span class="muted">ยังไม่เคยเข้า</span>') + '</td><td><button class="btn link pl-ed">แก้ไข</button></td></tr>'; }).join('') + '</tbody></table></div></div></div>';
+  /** แสดงรหัสผ่านชั่วคราว (ครั้งเดียว) ให้ผู้ดูแลแจ้งเจ้าหน้าที่ */
+  function showTemp(r) {
+    var b = modal('<h2>รหัสผ่านชั่วคราว</h2><p class="muted">แจ้งรหัสนี้ให้ <b>' + esc(r.name) + '</b> (เลขเจ้าหน้าที่ ' + esc(r.empCode) + ') ใช้เข้าสู่ระบบครั้งแรก ระบบจะให้ตั้งรหัสผ่านใหม่ทันที</p><div class="tempass" id="tpV">' + esc(r.tempPass) + '</div>' +
+      '<div class="note warn">รหัสนี้แสดง<b>ครั้งเดียว</b> ระบบไม่เก็บรหัสไว้ให้ดูย้อนหลัง หากทำหาย ให้กด "แก้ไข" แล้วเลือก "ออกรหัสผ่านชั่วคราวใหม่"</div><div class="modal-act"><button class="btn ghost-dark" id="tpC">คัดลอกรหัส</button><button class="btn primary" id="tpX" autofocus>รับทราบ ปิดหน้าต่าง</button></div>', { cls: 'sm', noClose: true });
+    $('#tpX', b).onclick = function () { modal._lock = false; closeModal(); };
+    $('#tpC', b).onclick = function () { var no = function () { toast('คัดลอกไม่ได้ กรุณาจดรหัสด้วยตนเอง', 'bad'); }; try { navigator.clipboard.writeText(r.tempPass).then(function () { toast('คัดลอกรหัสแล้ว', 'ok'); }, no); } catch (e) { no(); } };
+  }
   function box(u) {
-    var b = modal('<h2>' + (u ? 'แก้ไขเจ้าหน้าที่' : 'เพิ่มเจ้าหน้าที่') + '</h2><form class="form" id="ubF" autocomplete="off"><label>เลขเจ้าหน้าที่<div class="inrow"><input id="ubC" inputmode="numeric" maxlength="10" required value="' + esc(u ? u.empCode : '') + '"' + (u ? ' disabled' : ' autofocus') + '>' + (d.smartApi ? '<button type="button" class="btn ghost-dark sm" id="ubL">ดึงชื่อจากระบบ HR</button>' : '') + '</div></label>' +
+    var self = u && u.empCode === TG.me.empCode;
+    var b = modal('<h2>' + (u ? 'แก้ไขเจ้าหน้าที่' : 'เพิ่มเจ้าหน้าที่') + '</h2><form class="form" id="ubF" autocomplete="off"><label>เลขเจ้าหน้าที่<div class="inrow"><input id="ubC" inputmode="numeric" maxlength="10" pattern="[0-9]{4,10}" title="ตัวเลข 4–10 หลัก" required value="' + esc(u ? u.empCode : '') + '"' + (u ? ' disabled' : ' autofocus') + '>' + (d.smartApi && !u ? '<button type="button" class="btn ghost-dark sm" id="ubL">ดึงชื่อจากระบบ HR</button>' : '') + '</div></label>' +
       '<label>ชื่อ-สกุล<input id="ubN" maxlength="120" required value="' + esc(u ? u.name : '') + '"></label><label>หน่วยงาน<input id="ubU" maxlength="160" value="' + esc(u ? u.unit : '') + '"></label>' +
       '<div class="se-l">บทบาท</div><label class="chk"><input type="checkbox" id="ubRC"' + (!u || u.roles.indexOf('COMMITTEE') >= 0 ? ' checked' : '') + '> กรรมการสอบ — ตรวจและให้คะแนนในรอบที่ได้รับแต่งตั้ง</label><label class="chk"><input type="checkbox" id="ubRA"' + (u && u.roles.indexOf('ADMIN') >= 0 ? ' checked' : '') + '> ผู้ดูแลระบบ — ตั้งค่ารอบสอบ ข้อสอบ ผู้เข้าสอบ และเจ้าหน้าที่</label>' +
-      '<label>' + (u ? 'ตั้งรหัสผ่านใหม่ด้วยเลขประจำตัวประชาชน (เว้นว่างถ้าไม่เปลี่ยน)' : 'เลขประจำตัวประชาชน 13 หลัก (ใช้เป็นรหัสผ่านครั้งแรก)') + '<input id="ubI" inputmode="numeric" maxlength="17" autocomplete="off"' + (u ? '' : ' required') + ' placeholder="x-xxxx-xxxxx-xx-x"></label>' +
-      (u ? '<label class="chk"><input type="checkbox" id="ubA"' + (u.active ? ' checked' : '') + '> เปิดใช้งานบัญชี</label>' : '') + '<div class="modal-act"><button type="button" class="btn ghost-dark" id="ubX">ยกเลิก</button><button class="btn primary" id="ubS">บันทึก</button></div></form>');
+      (u ? (self ? '' : '<div class="se-l">รหัสผ่าน</div><label class="chk"><input type="checkbox" id="ubR"> ออกรหัสผ่านชั่วคราวใหม่ (ใช้เมื่อเจ้าหน้าที่ลืมรหัสผ่าน — รหัสเดิมจะใช้ไม่ได้ทันที)</label>') + '<label class="chk"><input type="checkbox" id="ubA"' + (u.active ? ' checked' : '') + '> เปิดใช้งานบัญชี</label>'
+        : '<div class="note info">เมื่อบันทึก ระบบจะสุ่ม<b>รหัสผ่านชั่วคราว</b>และแสดงให้ท่านเห็น 1 ครั้ง เพื่อแจ้งเจ้าหน้าที่ · ไม่ต้องใช้เลขประจำตัวประชาชน</div>') +
+      '<div class="modal-act"><button type="button" class="btn ghost-dark" id="ubX">ยกเลิก</button><button class="btn primary" id="ubS">บันทึก</button></div></form>');
     $('#ubX', b).onclick = closeModal;
-    if ($('#ubL', b)) $('#ubL', b).onclick = function () { var bt = this; busy(bt, true, 'กำลังค้นหา…'); api('lookupStaff', { empCode: val('ubC', b) }).then(function (r) { busy(bt, false); $('#ubN', b).value = r.name; $('#ubU', b).value = r.unit; toast('พบข้อมูล: ' + r.name + (r.position ? ' (' + r.position + ')' : ''), 'ok'); }).catch(function (e) { busy(bt, false); toast(e.message, 'bad'); }); };
+    if ($('#ubL', b)) $('#ubL', b).onclick = function () { var bt = this; busy(bt, true, 'กำลังค้นหา…'); api('lookupStaff', { empCode: val('ubC', b) }).then(function (r) { busy(bt, false); $('#ubN', b).value = r.name; $('#ubU', b).value = r.unit; toast('พบข้อมูล: ' + r.name + (r.position ? ' (' + r.position + ')' : ''), 'ok'); }).catch(function (e) { busy(bt, false); toast(e.message, 'bad', 9000); }); };
     $('#ubF', b).onsubmit = function (e) {
       e.preventDefault(); var roles = []; if ($('#ubRA', b).checked) roles.push('ADMIN'); if ($('#ubRC', b).checked) roles.push('COMMITTEE');
+      if (!roles.length) return toast('กรุณาเลือกบทบาทอย่างน้อย 1 อย่าง', 'bad');
       busy($('#ubS', b), true);
-      api('saveStaff', { empCode: u ? u.empCode : val('ubC', b), name: val('ubN', b), unit: val('ubU', b), roles: roles, idCard: val('ubI', b), active: u ? $('#ubA', b).checked : true }).then(function () { closeModal(); toast('บันทึกแล้ว', 'ok'); return loadAdmin(true); }).then(viewPeople).catch(function (er) { busy($('#ubS', b), false); toast(er.message, 'bad'); });
+      api('saveStaff', { empCode: u ? u.empCode : val('ubC', b), name: val('ubN', b), unit: val('ubU', b), roles: roles, isNew: !u, resetPass: !!($('#ubR', b) && $('#ubR', b).checked), active: u ? $('#ubA', b).checked : true })
+        .then(function (r) { closeModal(); toast(r.isNew ? 'เพิ่มเจ้าหน้าที่แล้ว' : 'บันทึกแล้ว', 'ok'); return loadAdmin(true).then(function () { viewPeople(); if (r.tempPass) showTemp(r); }); })
+        .catch(function (er) { busy($('#ubS', b), false); toast(er.message, 'bad', 9000); });
     };
   }
   $('#plNew').onclick = function () { box(null); };
@@ -486,7 +512,7 @@ function viewSettings() {
     '<button class="btn primary" id="stS">บันทึกการตั้งค่า</button></form></div>' +
     '<div class="card"><h2 class="card-t">ระบบและการเชื่อมต่อ</h2><table class="kv"><tr><th>รุ่นหน้าเว็บ</th><td>' + esc(TG_BUILD) + '</td></tr><tr><th>รุ่นหลังบ้าน</th><td>' + esc(d.app.build) + ' ' + (d.app.build === TG_BUILD ? '<span class="tag ok">ตรงกัน</span>' : '<span class="tag bad">ไม่ตรงกัน</span>') + '</td></tr><tr><th>ช่วงผ่อนผันหลังหมดเวลา</th><td>' + d.app.graceSec + ' วินาที</td></tr>' +
     '<tr><th>ฐานข้อมูล</th><td>' + (d.links.sheet ? '<a href="' + esc(d.links.sheet) + '" target="_blank" rel="noopener">เปิด Google Sheet</a>' : '–') + '</td></tr><tr><th>ไฟล์สอบ</th><td>' + (d.links.folder ? '<a href="' + esc(d.links.folder) + '" target="_blank" rel="noopener">เปิดโฟลเดอร์ Google Drive</a>' : '–') + '</td></tr>' +
-    '<tr><th>ระบบ HR (SmartAPI)</th><td>' + (d.smartApi ? '<span class="tag ok">ตั้งค่าแล้ว</span> <button class="btn link" id="stT">ทดสอบการเชื่อมต่อ</button>' : '<span class="tag">ยังไม่ได้เชื่อมต่อ</span><br><small class="muted">ไม่บังคับ — ใช้ดึงชื่อเจ้าหน้าที่จากเลขเจ้าหน้าที่ ตั้ง SMARTAPI_USER / SMARTAPI_PASS ใน Script Properties</small>') + '</td></tr>' +
+    '<tr><th>ระบบ HR (SmartAPI)</th><td>' + (d.smartApi ? '<span class="tag ok">ตั้งค่าแล้ว</span> <button class="btn link" id="stT">ทดสอบการเชื่อมต่อ</button>' : '<span class="tag">ยังไม่ได้เชื่อมต่อ</span><br><small class="muted">ไม่บังคับ — ใช้ดึงชื่อเจ้าหน้าที่จากเลขเจ้าหน้าที่ ต้องมีไฟล์ SmartApiClient.gs ในโครงการ Apps Script และตั้ง SMARTAPI_USER / SMARTAPI_PASS ใน Script Properties · ถ้าไม่เชื่อม ให้กรอกชื่อเจ้าหน้าที่เองได้ตามปกติ</small>') + '</td></tr>' +
     '<tr><th>ชุดข้อสอบของรุ่นนี้</th><td><button class="btn link" id="stX">ตรวจและติดตั้งชุดข้อสอบที่ยังไม่มีในคลัง</button><br><small class="muted">ปกติระบบติดตั้งให้เองหลังอัปเดต · ไม่แตะข้อสอบเดิม</small></td></tr></table>' +
     '<p class="muted sm">Google Sheet และโฟลเดอร์ Drive เปิดได้เฉพาะเจ้าของบัญชีที่ติดตั้งระบบ ห้ามแชร์ให้ผู้อื่น เพราะมีเฉลยข้อสอบและรหัสเข้าสอบ</p></div></div>' +
     '<div class="card"><h2 class="card-t">ทดสอบรับโหลด</h2><p class="card-s">จำลองผู้เข้าสอบหลายคนเข้าระบบ ทำข้อสอบ บันทึก ส่งคำตอบ และส่งไฟล์<b>พร้อมกัน</b>บนระบบจริง เพื่อวัดว่าระบบรับได้หรือไม่ · ใช้รอบสอบจำลองแยกต่างหาก ไม่กระทบข้อมูลจริง และลบทิ้งเองเมื่อจบ · <b>ห้ามรันระหว่างการสอบจริง</b></p>' +

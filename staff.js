@@ -1,7 +1,7 @@
 /* =====================================================================
    SOMDEJ TalentGate · staff.js — หน้ากรรมการ/ผู้ดูแล: รอบสอบ · ภาพรวม · ติดตามสอบ · ตรวจ · สรุปผล
    ===================================================================== */
-var BD = { id: null, data: null, at: 0, tab: null, essays: null, mon: null, monT: null, tickT: null, essayQ: null };
+var BD = { id: null, data: null, at: 0, tab: null, essays: null, mon: null, monT: null, tickT: null, essayQ: null, docs: null };
 var ST_TH = { DRAFT: 'ร่าง', OPEN: 'เปิดสอบ', GRADING: 'ปิดรับคำตอบ · กำลังตรวจ', FINAL: 'ยืนยันผลแล้ว' };
 var CS_TH = { ACTIVE: 'มีสิทธิ์สอบ', WITHDRAWN: 'สละสิทธิ์', ABSENT: 'ขาดสอบ', BLOCKED: 'ระงับสิทธิ์' };
 var TYPE_TH = { PROFILE: 'ทัศนคติ/บุคลิกภาพ', THEORY: 'ทฤษฎี', PRACTICAL: 'ปฏิบัติ (ส่งไฟล์)' };
@@ -31,26 +31,30 @@ function viewStaffHome() {
 function boardRoute(examId, tab) {
   boardStop(); TG.view = 'board';
   var fresh = BD.id === examId && BD.data && Date.now() - BD.at < 15000;
-  if (BD.id !== examId) { BD.data = null; BD.essays = null; BD.mon = null; BD.essayQ = null; }
+  if (BD.id !== examId) { BD.data = null; BD.essays = null; BD.mon = null; BD.essayQ = null; BD.docs = null; }
   BD.id = examId; BD.tab = tab;
   if (BD.data) drawBoard(); else $('#app').innerHTML = '<div class="boot"><div class="boot-ring"></div><p>กำลังโหลดข้อมูลรอบสอบ…</p></div>';
   if (!fresh) loadBoard();
 }
 function loadBoard(quiet) {
-  return api('getBoard', { examId: BD.id }).then(function (d) { var first = !BD.data; BD.data = d; BD.at = Date.now(); if (TG.view === 'board' && !editingNow()) { if (first) enterAnim(); drawBoard(); } return d; })
+  var ver = saveGrade._ver || 0;
+  return api('getBoard', { examId: BD.id }).then(function (d) {
+    // มีการบันทึกคะแนนระหว่างที่โหลด → ข้อมูลชุดนี้อาจเก่ากว่าที่เพิ่งกรอก: ทิ้ง แล้วโหลดใหม่เมื่อบันทึกเสร็จ (กันคะแนนบนจอย้อนกลับ)
+    if (BD.data && BD.data.exam.examId === BD.id && ((saveGrade._n || 0) > 0 || (saveGrade._ver || 0) !== ver)) return savesIdle().then(function () { return loadBoard(quiet); });
+    var first = !BD.data; BD.data = d; BD.at = Date.now(); if (TG.view === 'board' && !editingNow()) { if (first) enterAnim(); drawBoard(); } return d; })
     .catch(function (e) { toast(e.message, 'bad'); if (!BD.data) { location.hash = '#/staff'; } });
 }
 /** ไม่วาดหน้าใหม่ทับขณะกรรมการกำลังพิมพ์คะแนน */
-function editingNow() { var a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest && a.closest('#tab') && (BD.tab === 'essay' || BD.tab === 'practical' || BD.tab === 'setup' || BD.tab === 'cands'); }
+function editingNow() { var a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest && a.closest('#tab') && (BD.tab === 'essay' || BD.tab === 'practical' || BD.tab === 'setup' || BD.tab === 'cands' || BD.tab === 'interview'); }
 function drawBoard() {
-  var d = BD.data, e = d.exam, tabs = [['overview', 'ภาพรวม'], ['monitor', 'ติดตามสอบ'], ['essay', 'ตรวจข้อเขียน'], ['practical', 'ตรวจภาคปฏิบัติ'], ['profile', 'ทัศนคติและบุคลิกภาพ'], ['results', 'สรุปผล'], ['survey', 'ความพึงพอใจ']];
+  var d = BD.data, e = d.exam, tabs = [['overview', 'ภาพรวม'], ['monitor', 'ติดตามสอบ'], ['essay', 'ตรวจข้อเขียน'], ['practical', 'ตรวจภาคปฏิบัติ'], ['profile', 'ทัศนคติและบุคลิกภาพ'], ['interview', 'สัมภาษณ์'], ['results', 'สรุปผล'], ['reports', 'รายงาน'], ['survey', 'ความพึงพอใจ']];
   if (d.isAdmin) tabs.push(['cands', 'ผู้เข้าสอบ'], ['setup', 'ตั้งค่ารอบสอบ']);
   if (!tabs.some(function (t) { return t[0] === BD.tab; })) BD.tab = 'overview';
   $('#app').innerHTML = '<div class="wrap"><a class="backlink" href="#/staff">' + ICON.back + 'รอบสอบทั้งหมด</a><div class="phead"><div><span class="eyebrow">' + esc(e.posName) + '</span><h1>' + esc(e.title) + '</h1><p class="muted">' + esc(e.examDate) + (e.place ? ' · ' + esc(e.place) : '') + '</p></div>' +
     '<div class="phead-r">' + stPill(e.status) + '<button class="icon-btn dark" id="bdRef" title="โหลดข้อมูลใหม่" aria-label="โหลดข้อมูลใหม่">' + ICON.refresh + '</button></div></div>' +
     '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<a class="tab' + (t[0] === BD.tab ? ' on' : '') + '" href="#/staff/' + encodeURIComponent(e.examId) + '/' + t[0] + '">' + t[1] + '</a>'; }).join('') + '</div><div id="tab"></div></div>';
   $('#bdRef').onclick = function () { var b = this; b.classList.add('spinning'); BD.essays = null; loadBoard().then(function () { b.classList.remove('spinning'); toast('โหลดข้อมูลล่าสุดแล้ว', 'ok'); }); };
-  ({ overview: tabOverview, monitor: tabMonitor, essay: tabEssay, practical: tabPractical, profile: tabProfile, results: tabResults, survey: tabSurvey, cands: tabCands, setup: tabSetup })[BD.tab]();
+  ({ overview: tabOverview, monitor: tabMonitor, essay: tabEssay, practical: tabPractical, profile: tabProfile, results: tabResults, survey: tabSurvey, cands: tabCands, setup: tabSetup, interview: tabInterview, reports: tabReports })[BD.tab]();
   countUp($('#tab'));
 }
 /** ป้ายผู้เข้าสอบ — ในหน้าตรวจ (grading) ถ้ารอบนี้ตั้ง "ปิดชื่อ" จะแสดงเฉพาะเลขประจำตัวสอบ แม้เป็นผู้ดูแล */
@@ -79,9 +83,9 @@ function tabOverview() {
   var h = '<div class="kpis"><div class="kpi"><b data-cu="' + act.length + '">' + act.length + '</b><span>ผู้มีสิทธิ์สอบ</span><small>จากรายชื่อ ' + d.candidates.length + ' คน</small></div><div class="kpi"><b data-cu="' + logged + '">' + logged + '</b><span>เข้าระบบแล้ว</span><small>' + (act.length - logged) + ' คนยังไม่เข้า</small></div>' +
     '<div class="kpi"><b data-cu="' + allDone + '">' + allDone + '</b><span>ส่งครบทุกตอน</span><small>จากผู้เริ่มสอบ ' + started.length + ' คน</small></div><div class="kpi"><b data-cu="' + graded + '">' + graded + '</b><span>ตรวจครบแล้ว</span><small>' + (started.length - graded) + ' คนรอตรวจ</small></div></div>';
   if (d.isAdmin) {
-    var i = ['DRAFT', 'OPEN', 'GRADING', 'FINAL'].indexOf(e.status), next = [['OPEN', 'เปิดสอบ', 'ผู้เข้าสอบจะเข้าสู่ระบบและเริ่มทำข้อสอบได้'], ['GRADING', 'ปิดรับคำตอบ', 'ผู้เข้าสอบจะเข้าระบบไม่ได้อีก ตอนที่ยังทำค้างจะถูกปิดด้วยคำตอบที่บันทึกไว้ล่าสุด'], ['FINAL', 'ยืนยันผลสอบ', 'คะแนนจะถูกล็อก กรรมการแก้ไขไม่ได้อีก'], null][i];
+    var i = ['DRAFT', 'OPEN', 'GRADING', 'FINAL'].indexOf(e.status), next = [['OPEN', 'เปิดสอบ', 'ผู้เข้าสอบจะเข้าสู่ระบบและเริ่มทำข้อสอบได้'], ['GRADING', 'ปิดรับคำตอบ', 'ผู้เข้าสอบจะเข้าระบบไม่ได้อีก ตอนที่ยังทำค้างจะถูกปิดด้วยคำตอบที่บันทึกไว้ล่าสุด'], ['FINAL', 'ยืนยันผลสอบ', 'คะแนนทั้งหมด' + (e.ivOn ? ' (รวมคะแนนสัมภาษณ์) ' : '') + 'จะถูกล็อก กรรมการแก้ไขไม่ได้อีก' + (e.ivOn ? ' — กดเมื่อสัมภาษณ์และให้คะแนนเสร็จทุกคนแล้วเท่านั้น' : '')], null][i];
     h += '<div class="card"><div class="card-head"><div><h2 class="card-t">ขั้นตอนของรอบสอบ</h2><p class="card-s">สถานะปัจจุบัน: ' + ST_TH[e.status] + '</p></div><div class="acts">' + (i > 0 ? '<button class="btn ghost-dark sm" id="ovBack">ย้อนเป็น "' + ST_TH[['DRAFT', 'OPEN', 'GRADING'][i - 1]] + '"</button>' : '') + (next ? '<button class="btn primary" id="ovNext">' + next[1] + '</button>' : '') + '</div></div>' +
-      '<ol class="flow">' + ['DRAFT', 'OPEN', 'GRADING', 'FINAL'].map(function (s, j) { return '<li class="' + (j < i ? 'done' : j === i ? 'cur' : '') + '"><i>' + (j < i ? ICON.check : j + 1) + '</i><span>' + ['เตรียมรอบสอบ', 'เปิดสอบ', 'ตรวจและให้คะแนน', 'ยืนยันผล'][j] + '</span></li>'; }).join('') + '</ol>';
+      '<ol class="flow">' + ['DRAFT', 'OPEN', 'GRADING', 'FINAL'].map(function (s, j) { return '<li class="' + (j < i ? 'done' : j === i ? 'cur' : '') + '"><i>' + (j < i ? ICON.check : j + 1) + '</i><span>' + ['เตรียมรอบสอบ', 'เปิดสอบ', e.ivOn ? 'ตรวจ สัมภาษณ์ และให้คะแนน' : 'ตรวจและให้คะแนน', 'ยืนยันผล'][j] + '</span></li>'; }).join('') + '</ol>';
     if (e.status === 'DRAFT') {
       var pr = secs.filter(function (s) { return s.type === 'PRACTICAL' && !s.hasTemplate; });
       h += '<ul class="checks"><li class="' + (act.length ? 'ok' : 'no') + '">รายชื่อผู้เข้าสอบ ' + act.length + ' คน <a href="#/staff/' + encodeURIComponent(e.examId) + '/cands">จัดการรายชื่อและพิมพ์ใบรหัส</a></li>' +
@@ -103,7 +107,8 @@ function tabOverview() {
     var show = d.isAdmin || m.empCode === TG.me.empCode;
     return '<li><span class="ava">' + esc(m.name.replace(/^(นาย|นางสาว|นาง|ดร\.|พญ\.|นพ\.)\s*/, '').charAt(0)) + '</span><div><b>' + esc(m.name) + '</b><small>' + esc(m.empCode) + (show && need ? ' · ให้คะแนนแล้ว ' + n + ' / ' + need + ' รายการ' : '') + '</small>' + (show && need ? '<div class="bar"><i style="width:' + Math.round(n / need * 100) + '%"></i></div>' : '') + '</div></li>';
   }).join('') + '</ul>' : '<p class="muted">ยังไม่ได้แต่งตั้งกรรมการ</p>') +
-    '<p class="muted sm">' + (e.blind ? 'รอบนี้ <b>ปิดชื่อผู้เข้าสอบ</b>ในหน้าตรวจ: เห็นเฉพาะเลขประจำตัวสอบ (เปลี่ยนได้ที่สวิตช์ในแท็บตรวจ) · คะแนนของแต่ละรายการคือค่าเฉลี่ยของกรรมการทุกท่านที่ให้คะแนน' : 'คะแนนของแต่ละรายการคือค่าเฉลี่ยของกรรมการทุกท่านที่ให้คะแนน') + '</p></div></div>';
+    '<p class="muted sm">' + (e.blind ? 'รอบนี้ <b>ปิดชื่อผู้เข้าสอบ</b>ในหน้าตรวจ: เห็นเฉพาะเลขประจำตัวสอบ (เปลี่ยนได้ที่สวิตช์ในแท็บตรวจ) · คะแนนของแต่ละรายการคือค่าเฉลี่ยของกรรมการทุกท่านที่ให้คะแนน' : 'คะแนนของแต่ละรายการคือค่าเฉลี่ยของกรรมการทุกท่านที่ให้คะแนน') + '</p>' +
+    '<p class="ov-sign">' + ICON.shield + '<span>ยืนยันคะแนนแล้ว <b>' + d.signoffs.length + '</b> รายการ' + (d.signoffs.some(function (s) { return s.grader === d.me; }) ? '' : ' · ท่านยังไม่ได้ยืนยันคะแนน') + '</span><a class="btn link" href="#/staff/' + encodeURIComponent(e.examId) + '/reports">ยืนยันคะแนน / พิมพ์รายงาน</a></p></div></div>';
   $('#tab').innerHTML = h;
   $$('[data-open]').forEach(function (x) { x.onchange = function () { api('setSectionOpen', { secId: x.dataset.open, open: x.checked }).then(function () { toast(x.checked ? 'เปิดให้เริ่มตอนนี้แล้ว' : 'ปิดไว้ก่อน ผู้เข้าสอบจะเห็นว่า "รอกรรมการเปิดให้เริ่ม"', 'ok'); loadBoard(); }).catch(function (er) { x.checked = !x.checked; toast(er.message, 'bad'); }); }; });
   function setSt(st, title, msg, needPass) {
@@ -173,12 +178,19 @@ function tabMonitor() {
 /* ---------- บันทึกคะแนน (ใช้ร่วมกัน) ---------- */
 function saveGrade(examNo, items, el) {
   if (el) { el.className = 'gsave'; el.textContent = 'กำลังบันทึก…'; }
-  return api('saveGrades', { examId: BD.id, examNo: examNo, items: items }, { quiet: true }).then(function () {
+  // ส่งทีละคำสั่งต่อผู้เข้าสอบ 1 คน ตามลำดับที่กรอก — กันคำสั่งเก่าที่ช้ากว่าไปทับคะแนนใหม่เมื่อเครือข่ายสะดุด
+  var q = saveGrade._q = saveGrade._q || {}, k = BD.id + '|' + examNo, prev = q[k] || Promise.resolve(), examId = BD.id;
+  saveGrade._n = (saveGrade._n || 0) + 1; saveGrade._ver = (saveGrade._ver || 0) + 1;
+  var run = prev.then(function () { return api('saveGrades', { examId: examId, examNo: examNo, items: items }, { quiet: true }); });
+  q[k] = run.catch(function () { }).then(function () { saveGrade._n--; saveGrade._ver++; });
+  return run.then(function () {
     var c = BD.data.candidates.filter(function (x) { return x.examNo === examNo; })[0];
     items.forEach(function (it) { c.my[it.item] = { score: it.score === '' || it.score === null ? null : Number(it.score), comment: it.comment || '' }; });
     BD.at = 0; if (el) { el.className = 'gsave ok'; el.textContent = 'บันทึกแล้ว ' + new Date().toLocaleTimeString('th-TH', { hour12: false }); }
   }).catch(function (e) { if (el) { el.className = 'gsave bad'; el.textContent = e.message; } toast(e.message, 'bad'); throw e; });
 }
+/** รอให้คำสั่งบันทึกคะแนนที่ค้างอยู่เสร็จทั้งหมด */
+function savesIdle() { var q = saveGrade._q || {}; return Promise.all(Object.keys(q).map(function (k) { return q[k]; })).then(function () { return (saveGrade._n || 0) > 0 ? savesIdle() : null; }); }
 function scoreVal(inp, max) {
   var v = inp.value.trim(); if (v === '') return '';
   var n = Number(v); if (isNaN(n) || n < 0 || n > max) { inp.classList.add('err'); return null; }
@@ -346,30 +358,34 @@ function tabSurvey() {
 /* ---------- สรุปผล ---------- */
 function tabResults() {
   var d = BD.data, t = d.totals, list = activeCands().filter(function (c) { return c.result.started; }).sort(function (a, b) { return (a.result.rank || 999) - (b.result.rank || 999); });
+  var iv = d.exam.ivOn;
+  if (iv) list = activeCands().filter(function (c) { return c.result.started || c.iv; }).sort(function (a, b) { return ((a.final.rank || 9999) - (b.final.rank || 9999)) || ((a.result.rank || 9999) - (b.result.rank || 9999)) || byNo(a, b); });
   var hasProf = list.some(function (c) { return c.profile; });
   var hasEssay = d.items.some(function (i) { return i.kind === 'ESSAY'; }), hasPr = t.practMax > 0, mcqMax = d.sections.reduce(function (a, s) { return a + s.mcqMax; }, 0);
-  var done = list.filter(function (c) { return c.result.complete; }), pass = done.filter(function (c) { return c.result.pass; }).length, tot = list.map(function (c) { return c.result.total; });
-  var h = '<div class="kpis"><div class="kpi"><b data-cu="' + list.length + '">' + list.length + '</b><span>ผู้เข้าสอบ</span><small>ตรวจครบ ' + done.length + ' คน</small></div><div class="kpi ok"><b data-cu="' + pass + '">' + pass + '</b><span>ผ่านเกณฑ์</span><small>ตั้งแต่ ' + t.passMin + ' คะแนน</small></div>' +
+  var done = list.filter(function (c) { return c.result.complete; }), pass = done.filter(function (c) { return c.result.pass; }).length, tot = list.filter(function (c) { return c.result.started; }).map(function (c) { return c.result.total; });
+  var fpass = list.filter(function (c) { return c.final && c.final.complete && c.final.pass; }).length, nIv = list.filter(function (c) { return c.iv; }).length, nStart = tot.length;
+  var h = '<div class="kpis"><div class="kpi"><b data-cu="' + list.length + '">' + list.length + '</b><span>ผู้เข้าสอบ</span><small>ตรวจครบ ' + done.length + ' คน</small></div>' + (iv ? '<div class="kpi ok"><b data-cu="' + fpass + '">' + fpass + '</b><span>ผ่านเกณฑ์ (คะแนนรวม)</span><small>เข้าสัมภาษณ์ ' + nIv + ' คน · ผ่านเกณฑ์สอบ ' + pass + ' คน</small></div>' : '<div class="kpi ok"><b data-cu="' + pass + '">' + pass + '</b><span>ผ่านเกณฑ์</span><small>ตั้งแต่ ' + t.passMin + ' คะแนน</small></div>') +
     '<div class="kpi"><b>' + (tot.length ? num(tot.reduce(function (a, b) { return a + b; }, 0) / tot.length, 1) : '–') + '</b><span>คะแนนเฉลี่ย</span><small>จากเต็ม ' + t.totalMax + '</small></div><div class="kpi"><b>' + (tot.length ? num(Math.max.apply(null, tot)) : '–') + '</b><span>คะแนนสูงสุด</span><small>ต่ำสุด ' + (tot.length ? num(Math.min.apply(null, tot)) : '–') + '</small></div></div>';
-  h += '<div class="card"><div class="card-head"><div><h2 class="card-t">ผลคะแนนเรียงตามลำดับ</h2><p class="card-s">คะแนนข้อเขียนและภาคปฏิบัติเป็นค่าเฉลี่ยของกรรมการ · คะแนนเท่ากันให้ผู้ได้ภาคปฏิบัติสูงกว่าอยู่ลำดับดีกว่า' + (done.length < list.length ? ' · <b>ยังตรวจไม่ครบ ' + (list.length - done.length) + ' คน ลำดับอาจเปลี่ยน</b>' : '') + '</p></div><div class="acts noprint">' +
-    (d.isAdmin ? '<button class="btn ghost-dark sm" id="rsItem">วิเคราะห์ข้อสอบ</button>' + (readonly() ? '' : '<button class="btn ghost-dark sm" id="rsRe">คำนวณคะแนนปรนัยใหม่</button>') : '') + '<button class="btn ghost-dark sm" id="rsCsv">' + ICON.down + 'ส่งออก CSV</button><button class="btn ghost-dark sm" id="rsPrint">' + ICON.print + 'พิมพ์</button></div></div>';
+  h += '<div class="card"><div class="card-head"><div><h2 class="card-t">ผลคะแนนเรียงตามลำดับ</h2><p class="card-s">' + (iv ? '<b>คะแนนรวม</b> (เต็ม 100) = คะแนนสอบ ' + (100 - d.exam.ivWeight) + '% + สัมภาษณ์ ' + d.exam.ivWeight + '% · เกณฑ์ผ่านร้อยละ ' + d.exam.passPct + ' ของคะแนนรวม · ' : '') + 'คะแนนข้อเขียน' + (iv ? ' ภาคปฏิบัติ และสัมภาษณ์' : 'และภาคปฏิบัติ') + 'เป็นค่าเฉลี่ยของกรรมการ · คะแนนเท่ากันให้ผู้ได้ภาคปฏิบัติสูงกว่าอยู่ลำดับดีกว่า' + (done.length < nStart ? ' · <b>ยังตรวจไม่ครบ ' + (nStart - done.length) + ' คน ลำดับอาจเปลี่ยน</b>' : '') + '</p></div><div class="acts noprint">' +
+    (d.isAdmin ? '<button class="btn ghost-dark sm" id="rsItem">วิเคราะห์ข้อสอบ</button>' + (readonly() ? '' : '<button class="btn ghost-dark sm" id="rsRe">คำนวณคะแนนปรนัยใหม่</button>') : '') + '<button class="btn ghost-dark sm" id="rsCsv">' + ICON.down + 'ส่งออก CSV</button><a class="btn ghost-dark sm" id="rsPrint" href="#/staff/' + encodeURIComponent(d.exam.examId) + '/reports">' + ICON.print + 'พิมพ์รายงาน</a></div></div>';
   if (!list.length) h += '<p class="muted">ยังไม่มีผู้เข้าสอบเริ่มทำข้อสอบ</p>';
-  else h += '<div class="tblwrap"><table class="tbl res"><thead><tr><th class="c">ลำดับ</th><th>ผู้เข้าสอบ</th><th class="r">ปรนัย<small>/' + mcqMax + '</small></th>' + (hasEssay ? '<th class="r">ข้อเขียน<small>/' + (t.theoryMax - mcqMax) + '</small></th>' : '') + (hasPr ? '<th class="r">ทฤษฎีรวม<small>/' + t.theoryMax + '</small></th><th class="r">ปฏิบัติ<small>/' + t.practMax + '</small></th>' : '') + '<th class="r">รวม<small>/' + t.totalMax + '</small></th><th>ผล</th>' + (hasProf ? '<th class="c">ทัศนคติ<small>/4 · ไม่คิดคะแนน</small></th><th class="c">บุคลิกภาพ</th>' : '') + '<th>หมายเหตุ</th></tr></thead><tbody>' +
+  else h += '<div class="tblwrap"><table class="tbl res"><thead><tr><th class="c">ลำดับ</th><th>ผู้เข้าสอบ</th><th class="r">ปรนัย<small>/' + mcqMax + '</small></th>' + (hasEssay ? '<th class="r">ข้อเขียน<small>/' + (t.theoryMax - mcqMax) + '</small></th>' : '') + (hasPr ? '<th class="r">ทฤษฎีรวม<small>/' + t.theoryMax + '</small></th><th class="r">ปฏิบัติ<small>/' + t.practMax + '</small></th>' : '') + '<th class="r">' + (iv ? 'รวมสอบ' : 'รวม') + '<small>/' + t.totalMax + '</small></th><th>' + (iv ? 'ผลสอบ' : 'ผล') + '</th>' + (iv ? '<th class="r">สัมภาษณ์<small>/' + d.ivMax + '</small></th><th class="r">คะแนนรวม<small>/100</small></th><th>ผลรวม</th>' : '') + (hasProf ? '<th class="c">ทัศนคติ<small>/4 · ไม่คิดคะแนน</small></th><th class="c">บุคลิกภาพ</th>' : '') + '<th>หมายเหตุ</th></tr></thead><tbody>' +
     list.map(function (c) {
       var r = c.result, fl = []; Object.keys(c.secs).forEach(function (k) { String(c.secs[k].flag || '').split(',').filter(String).forEach(function (f) { if (fl.indexOf(f) < 0) fl.push(f); }); });
       var bl = Object.keys(c.secs).reduce(function (a, k) { return a + (c.secs[k].blur || 0); }, 0);
-      return '<tr class="' + (r.complete ? (r.pass ? 'pass' : 'fail') : '') + '"><td class="c"><span class="rank' + (r.rank <= 3 ? ' top' : '') + '">' + (r.rank || '–') + '</span></td><td>' + cLabel(c) + '</td><td class="r">' + num(r.mcq) + '</td>' + (hasEssay ? '<td class="r">' + num(r.essay) + '</td>' : '') + (hasPr ? '<td class="r">' + num(r.theory) + '</td><td class="r">' + num(r.practical) + '</td>' : '') +
-        '<td class="r"><b class="tot">' + num(r.total) + '</b></td><td>' + (r.complete ? (r.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอตรวจ</span>') + '</td>' +
+      var f = c.final, rk = iv ? (f && f.rank) : r.rank, rowCls = iv ? (f && f.complete ? (f.pass ? 'pass' : 'fail') : '') : (r.complete ? (r.pass ? 'pass' : 'fail') : '');
+      return '<tr class="' + rowCls + '"><td class="c"><span class="rank' + (rk && rk <= 3 ? ' top' : '') + '">' + (rk || '–') + '</span></td><td>' + cLabel(c) + '</td><td class="r">' + num(r.mcq) + '</td>' + (hasEssay ? '<td class="r">' + num(r.essay) + '</td>' : '') + (hasPr ? '<td class="r">' + num(r.theory) + '</td><td class="r">' + num(r.practical) + '</td>' : '') +
+        '<td class="r"><b class="tot">' + num(r.total) + '</b></td><td>' + (!r.started ? '<span class="tag">ไม่ได้เข้าสอบ</span>' : r.complete ? (r.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอตรวจ</span>') + '</td>' +
+        (iv ? '<td class="r">' + (c.iv ? num(f.iv !== null ? f.iv : f.ivPart) + (f.iv === null && f.ivPart !== null ? '*' : '') : '<span class="muted">–</span>') + '</td><td class="r"><b class="tot">' + (f && f.score !== null ? num(f.score) : '–') + '</b></td><td>' + (!c.iv ? '<span class="tag">ไม่ได้สัมภาษณ์</span>' : f.complete ? (f.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอคะแนน</span>') + '</td>' : '') +
         (hasProf ? '<td class="c">' + (c.profile && c.profile.nAtt ? '<span class="tag ' + attLevel(c.profile.att)[1] + '" title="' + attLevel(c.profile.att)[0] + '">' + num(c.profile.att, 2) + '</span>' : '–') + '</td><td class="c">' + (c.profile && c.profile.mbti ? '<span class="mbti sm" title="' + esc((MB_T[c.profile.mbti] || [''])[0]) + '">' + esc(c.profile.mbti) + '</span>' : '–') + '</td>' : '') + '<td>' + flagTags(fl.join(',')) + (bl ? '<span class="tag ' + (bl >= 3 ? 'bad' : 'warn') + '">ออกจอ ' + bl + '</span>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   $('#tab').innerHTML = h + '</div>';
-  $('#rsPrint').onclick = function () { window.print(); };
   $('#rsCsv').onclick = function () {
-    var e = d.exam, head = ['ลำดับ', 'เลขประจำตัวสอบ'].concat(d.blind ? [] : ['ชื่อ-สกุล'], ['ปรนัย', 'ข้อเขียน', 'ทฤษฎีรวม', 'ปฏิบัติ', 'รวม', 'ผล', 'บุคลิกภาพ', 'คะแนนทัศนคติ (เต็ม 4 ไม่คิดคะแนน)'], d.dims, d.items.map(function (i) { return i.label + ' (เฉลี่ย)'; }), ['จำนวนกรรมการที่ให้คะแนน', 'หมายเหตุ', 'สลับหน้าจอ (ครั้ง)']);
-    var rows = [[e.title], [e.examDate + ' ' + e.place], ['ส่งออกเมื่อ ' + tDate(now()) + ' · สถานะ ' + ST_TH[e.status] + ' · เกณฑ์ผ่าน ' + t.passMin + '/' + t.totalMax], [], head];
+    var e = d.exam, head = ['ลำดับ', 'เลขประจำตัวสอบ'].concat(d.blind ? [] : ['ชื่อ-สกุล'], ['ปรนัย', 'ข้อเขียน', 'ทฤษฎีรวม', 'ปฏิบัติ', 'รวม', 'ผล'], iv ? ['เข้าสัมภาษณ์', 'สัมภาษณ์ (เต็ม ' + d.ivMax + ')', 'คะแนนรวม (เต็ม 100)', 'ลำดับคะแนนรวม', 'ผลรวม'] : [], ['บุคลิกภาพ', 'คะแนนทัศนคติ (เต็ม 4 ไม่คิดคะแนน)'], d.dims, d.items.map(function (i) { return i.label + ' (เฉลี่ย)'; }), ['จำนวนกรรมการที่ให้คะแนน', 'หมายเหตุ', 'สลับหน้าจอ (ครั้ง)']);
+    var rows = [[e.title], [e.examDate + ' ' + e.place], ['ส่งออกเมื่อ ' + tDate(now()) + ' โดย ' + printWho() + ' · สถานะ ' + ST_TH[e.status] + ' · เกณฑ์ผ่าน ' + (iv ? 'ร้อยละ ' + e.passPct + ' ของคะแนนรวม (สอบ ' + (100 - e.ivWeight) + ' : สัมภาษณ์ ' + e.ivWeight + ')' : t.passMin + '/' + t.totalMax)], [], head];
     list.forEach(function (c) {
       var r = c.result, fl = []; Object.keys(c.secs).forEach(function (k) { String(c.secs[k].flag || '').split(',').filter(String).forEach(function (f) { fl.push(FLAG_TH[f] || f); }); });
-      rows.push([r.rank || '', c.examNo].concat(d.blind ? [] : [c.name], [r.mcq, r.essay, r.theory, r.practical, r.total, r.complete ? (r.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอตรวจ', c.profile ? c.profile.mbti : '', c.profile ? c.profile.att : ''], d.dims.map(function (x) { return c.profile ? c.profile.dims[x] : ''; }),
+      rows.push([r.rank || '', c.examNo].concat(d.blind ? [] : [c.name], [r.mcq, r.essay, r.theory, r.practical, r.total, r.complete ? (r.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอตรวจ'], iv ? [c.iv ? 'ใช่' : '', c.final.iv, c.final.score, c.final.rank || '', !c.iv ? '' : c.final.complete ? (c.final.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอคะแนน'] : [], [c.profile ? c.profile.mbti : '', c.profile ? c.profile.att : ''], d.dims.map(function (x) { return c.profile ? c.profile.dims[x] : ''; }),
         d.items.map(function (i) { return c.avg[i.item].avg; }), [Math.max.apply(null, d.items.map(function (i) { return c.avg[i.item].n; }).concat([0])), fl.join(' / '), Object.keys(c.secs).reduce(function (a, k) { return a + (c.secs[k].blur || 0); }, 0)]));
     });
     saveCsv('TalentGate_Result_' + e.examId + '.csv', rows);

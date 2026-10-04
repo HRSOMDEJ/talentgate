@@ -2,7 +2,7 @@
    SOMDEJ TalentGate · app.js — แกนกลาง · เข้าสู่ระบบ · ตัวช่วยที่ใช้ร่วมกัน
    BUILD ต้องตรงกัน 3 ที่: Config.gs · app.js (TG_BUILD) · version.json (+ ?v= ใน index.html)
    ===================================================================== */
-var TG_BUILD = '2569-10-04.1';
+var TG_BUILD = '2569-10-04.2';
 var TG = { boot: null, token: null, kind: null, me: null, home: null, state: null, offset: 0, view: null };
 
 /* ---------- ตัวช่วยทั่วไป ---------- */
@@ -96,6 +96,34 @@ function fileB64(file) {
   return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res(String(r.result).split(',')[1] || ''); }; r.onerror = function () { rej(new Error('อ่านไฟล์ไม่ได้ กรุณาปิดไฟล์ในโปรแกรม Excel ก่อน แล้วลองอีกครั้ง')); }; r.readAsDataURL(file); });
 }
 
+/* ---------- การพิมพ์: ทุกเอกสารระบุผู้พิมพ์ วันที่ และเวลา (และรหัสเอกสาร ถ้ามี) ที่ท้ายกระดาษทุกหน้า ---------- */
+function tLong(ms) { return ms ? new Date(ms).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Bangkok' }) + ' เวลา ' + tTime(ms).replace(':', '.') + ' น.' : '–'; }
+var PR = { meta: null };
+(function () { var m = navigator.userAgent.match(/(?:Chrome|Edg)\/(\d+)/); if (m && +m[1] >= 131 && !/CriOS|EdgiOS/.test(navigator.userAgent)) document.documentElement.classList.add('mbx'); })();
+function printWho() { return TG.kind === 'staff' && TG.me ? TG.me.name + ' (' + TG.me.empCode + ')' : ''; }
+/** ตั้งค่าหน้ากระดาษ + ข้อความท้ายกระดาษ (Chrome/Edge รุ่น 131 ขึ้นไปพิมพ์ท้ายกระดาษทุกหน้าพร้อมเลขหน้า · เบราว์เซอร์อื่นพิมพ์ข้อความเดียวกันไว้ท้ายเอกสาร) */
+function printSetup(meta) {
+  meta = meta || {};
+  var who = printWho(), at = meta.at || now(), txt = (who ? 'พิมพ์โดย ' + who + ' · ' : 'พิมพ์เมื่อ ') + tLong(at) + (meta.code ? ' · รหัสเอกสาร ' + meta.code : '') + ' · SOMDEJ TalentGate';
+  var q = function (x) { return String(x).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' '); };
+  var st = $('#pgStyle'); if (!st) { st = document.createElement('style'); st.id = 'pgStyle'; document.head.appendChild(st); }
+  st.textContent = '@page{' + (meta.landscape ? 'size:A4 landscape;' : meta.portrait ? 'size:A4 portrait;' : '') + 'margin:' + (meta.margin || '12mm 12mm 15mm') + ';' +
+    '@bottom-left{content:"' + q(txt) + '";font-family:"IBM Plex Sans Thai","Anuphan",sans-serif;font-size:7.5pt;color:#333}' +
+    '@bottom-right{content:"หน้า " counter(page) " / " counter(pages);font-family:"IBM Plex Sans Thai","Anuphan",sans-serif;font-size:7.5pt;color:#333}}';
+  var ps = $('#printStamp'); if (ps) ps.textContent = txt;
+  PR.meta = meta;
+  return txt;
+}
+window.addEventListener('beforeprint', function () { if (!document.body.classList.contains('printing')) printSetup({}); });
+function printDone() { document.body.classList.remove('printing'); var p = $('#printRoot'); if (p) p.innerHTML = ''; PR.meta = null; }
+/** พิมพ์เอกสารที่ระบบจัดรูปให้ (ซ่อนหน้าจอทั้งหมด เหลือเฉพาะเอกสาร) — meta: {landscape, code, at} */
+function printDoc(html, meta) {
+  var p = $('#printRoot'), txt = printSetup(meta || {});
+  p.innerHTML = html + '<p class="pr-stamp">' + esc(txt) + '</p>';
+  document.body.classList.add('printing'); closeModal();
+  setTimeout(function () { window.print(); if (!window.__keepPrint) setTimeout(printDone, 700); }, 120);
+}
+
 /* ---------- เรียกหลังบ้าน (ไม่ตั้ง Content-Type เพื่อไม่ให้เกิด preflight) · พร้อมกันไม่เกิน 4 ----------
    ทุกคำขอมีรหัส rid: ถ้าเครือข่าย/Google ตอบผิดพลาด หน้าเว็บจะส่งซ้ำด้วย rid เดิม หลังบ้านจะไม่ทำซ้ำ (คืนผลเดิม) จึงลองใหม่ได้อย่างปลอดภัยทุกคำสั่ง */
 var _run = 0, _wait = [], _busyAll = 0, _fg = [], _fgT = null;
@@ -103,7 +131,8 @@ var ACT_TH = { loginCand: 'กำลังตรวจสอบรหัสเ�
   importCandidates: 'กำลังนำเข้ารายชื่อ', saveCandidate: 'กำลังบันทึกผู้เข้าสอบ', deleteCandidate: 'กำลังลบ', regenCodes: 'กำลังออกรหัสใหม่', resetSection: 'กำลังล้างตอน', extendTime: 'กำลังเพิ่มเวลา', rescore: 'กำลังตรวจคะแนนปรนัยใหม่',
   saveSet: 'กำลังบันทึกชุดข้อสอบ', saveQuestion: 'กำลังบันทึกข้อสอบ', deleteQuestion: 'กำลังลบข้อสอบ', importQuestions: 'กำลังนำเข้าข้อสอบ', setQuestionsActive: 'กำลังบันทึกการเลือกข้อสอบ', installExtraSets: 'กำลังติดตั้งชุดข้อสอบ',
   saveSettings: 'กำลังบันทึกการตั้งค่า', saveStaff: 'กำลังบันทึกเจ้าหน้าที่', savePosition: 'กำลังบันทึกตำแหน่ง', deletePosition: 'กำลังลบ', deleteExam: 'กำลังลบรอบสอบ', uploadTemplate: 'กำลังอัปโหลดไฟล์โจทย์', saveGrades: 'กำลังบันทึกคะแนน',
-  submitSurvey: 'กำลังส่งแบบประเมิน', setExamBlind: 'กำลังบันทึก', clearExamData: 'กำลังล้างข้อมูลซ้อมสอบ', loadTestStart: 'กำลังเตรียมข้อมูลจำลอง', loadTestEnd: 'กำลังลบข้อมูลจำลอง', lookupStaff: 'กำลังค้นหาในระบบ HR', testSmartApi: 'กำลังทดสอบการเชื่อมต่อ', logout: 'กำลังออกจากระบบ' };
+  submitSurvey: 'กำลังส่งแบบประเมิน', setExamBlind: 'กำลังบันทึก', clearExamData: 'กำลังล้างข้อมูลซ้อมสอบ', loadTestStart: 'กำลังเตรียมข้อมูลจำลอง', loadTestEnd: 'กำลังลบข้อมูลจำลอง', lookupStaff: 'กำลังค้นหาในระบบ HR', testSmartApi: 'กำลังทดสอบการเชื่อมต่อ', logout: 'กำลังออกจากระบบ',
+  setInterviewees: 'กำลังบันทึกรายชื่อผู้เข้าสัมภาษณ์', uploadDoc: 'กำลังอัปโหลดเอกสาร', deleteDoc: 'กำลังลบเอกสาร', signoff: 'กำลังยืนยันคะแนน', unlockSignoff: 'กำลังปลดล็อก', logPrint: 'กำลังออกรหัสเอกสาร' };
 function rid_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6); }
 /** แถบความคืบหน้าด้านบน (ทุกคำขอ) + ป๊อปอัป "กำลังดำเนินการ" (คำสั่งที่ผู้ใช้กด) — ให้รู้ว่าระบบยังทำงาน ไม่ได้ค้าง */
 function waitUI() {
@@ -230,7 +259,7 @@ function viewLogin(tab, msg) {
         '<label>เลขประจำตัวสอบ<input id="lgNo" inputmode="numeric" maxlength="12" placeholder="เช่น 7" required autofocus></label>' +
         '<label>รหัสเข้าสอบ 6 หลัก<input id="lgCode" class="code-in" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" autocomplete="off" required></label>' +
         '<button class="btn primary block lg" id="lgBtn">เข้าสู่ระบบสอบ</button></form>'
-      : '<form class="form" id="lgF"><h2>สำหรับเจ้าหน้าที่</h2><p class="muted">กรรมการสอบและผู้ดูแลระบบ เข้าด้วยเลขเจ้าหน้าที่ · ครั้งแรกใช้เลขประจำตัวประชาชนเป็นรหัสผ่าน แล้วระบบจะให้ตั้งรหัสใหม่</p>' +
+      : '<form class="form" id="lgF"><h2>สำหรับเจ้าหน้าที่</h2><p class="muted">กรรมการสอบและผู้ดูแลระบบ เข้าด้วยเลขเจ้าหน้าที่ · ครั้งแรกใช้รหัสผ่านชั่วคราวที่ได้รับจากผู้ดูแลระบบ แล้วระบบจะให้ตั้งรหัสใหม่</p>' +
         '<label>เลขเจ้าหน้าที่<input id="lgEmp" inputmode="numeric" maxlength="10" autocomplete="username" required autofocus></label>' +
         '<label>รหัสผ่าน<input id="lgPass" type="password" autocomplete="current-password" required></label>' +
         '<button class="btn primary block lg" id="lgBtn">เข้าสู่ระบบ</button></form>') +
@@ -263,8 +292,8 @@ function conn() {
 /* ---------- ตั้งรหัสผ่านใหม่ ---------- */
 function viewChangePass(forced) {
   var html = '<h2>' + (forced ? 'ตั้งรหัสผ่านใหม่ก่อนใช้งาน' : 'เปลี่ยนรหัสผ่าน') + '</h2>' +
-    (forced ? '<p class="muted">เพื่อความปลอดภัย ระบบให้ตั้งรหัสผ่านใหม่แทนเลขประจำตัวประชาชนในการเข้าครั้งแรก</p>' : '') +
-    '<form class="form" id="cpF"><label>' + (forced ? 'รหัสผ่านครั้งแรก (เลขประจำตัวประชาชน)' : 'รหัสผ่านเดิม') + '<input id="cpO" type="password" autocomplete="current-password" required autofocus></label>' +
+    (forced ? '<p class="muted">เพื่อความปลอดภัย ระบบให้ตั้งรหัสผ่านใหม่ของท่านเองแทนรหัสผ่านครั้งแรก</p>' : '') +
+    '<form class="form" id="cpF"><label>' + (forced ? 'รหัสผ่านที่ใช้เข้าครั้งนี้ (รหัสผ่านชั่วคราวที่ได้รับ)' : 'รหัสผ่านเดิม') + '<input id="cpO" type="password" autocomplete="current-password" required autofocus></label>' +
     '<label>รหัสผ่านใหม่<input id="cpN" type="password" autocomplete="new-password" minlength="8" required></label>' +
     '<label>ยืนยันรหัสผ่านใหม่<input id="cpC" type="password" autocomplete="new-password" minlength="8" required></label>' +
     '<ul class="rules"><li>ยาวอย่างน้อย 8 ตัวอักษร</li><li>มีทั้งตัวอักษรและตัวเลข</li><li>ไม่มีเลขเจ้าหน้าที่ของท่าน และไม่ซ้ำรหัสเดิม</li></ul>' +
