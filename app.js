@@ -2,7 +2,7 @@
    SOMDEJ TalentGate · app.js — แกนกลาง · เข้าสู่ระบบ · ตัวช่วยที่ใช้ร่วมกัน
    BUILD ต้องตรงกัน 3 ที่: Config.gs · app.js (TG_BUILD) · version.json (+ ?v= ใน index.html)
    ===================================================================== */
-var TG_BUILD = '2569-10-04.2';
+var TG_BUILD = '2569-10-07.1';
 var TG = { boot: null, token: null, kind: null, me: null, home: null, state: null, offset: 0, view: null };
 
 /* ---------- ตัวช่วยทั่วไป ---------- */
@@ -20,7 +20,25 @@ function tTime(ms, sec) { return ms ? new Date(ms).toLocaleTimeString('th-TH', {
 function tDate(ms) { return ms ? new Date(ms).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'Asia/Bangkok' }) + ' ' + tTime(ms) : '–'; }
 function num(x, d) { return x === null || x === undefined || x === '' ? '–' : Number(x).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: d === undefined ? 2 : d }); }
 function no3(n) { return /^\d+$/.test(String(n)) ? ('00' + n).slice(-3) : String(n); }
-function isAdmin() { return TG.kind === 'staff' && TG.me && TG.me.roles.indexOf('ADMIN') >= 0; }
+function hasRole(r) { return TG.kind === 'staff' && !!TG.me && (TG.me.roles || []).indexOf(r) >= 0; }
+function isAdmin() { return hasRole('ADMIN'); }
+function isHr() { return hasRole('HR'); }
+function isAuthor() { return hasRole('AUTHOR'); }
+function roleLabel() { return isAdmin() ? 'ผู้ดูแลระบบ' : isHr() ? 'ฝ่ายทรัพยากรบุคคล (ผู้สังเกตการณ์)' : isAuthor() && !hasRole('COMMITTEE') ? 'ผู้ออกข้อสอบ' : 'กรรมการสอบ'; }
+/** เรียงภาษาไทยตามพจนานุกรม (สระหน้าไม่นำ) */
+var TH_COLL = (function () { try { return new Intl.Collator('th', { numeric: true, sensitivity: 'base' }); } catch (e) { return null; } })();
+function thCmp(a, b) { a = String(a || ''); b = String(b || ''); return TH_COLL ? TH_COLL.compare(a, b) : a.localeCompare(b); }
+/** วาดหน้าจอใหม่โดยไม่ให้เลื่อนกลับไปบนสุด (เช่น หลังบันทึกรายชื่อ) */
+function keepScroll(fn) { var y = window.scrollY, x = window.scrollX; var r = fn(); window.scrollTo(x, y); requestAnimationFrame(function () { if (Math.abs(window.scrollY - y) > 4) window.scrollTo(x, y); }); return r; }
+/** ชื่อ-สกุล → { คำนำหน้า, ชื่อ, นามสกุล } (ใช้เรียงรายชื่อและจับคู่ชื่อไฟล์) */
+var TITLES = ['ว่าที่ร้อยตรีหญิง', 'ว่าที่ร้อยตรี', 'ว่าที่ ร.ต.หญิง', 'ว่าที่ ร.ต.', 'นางสาว', 'เด็กหญิง', 'เด็กชาย', 'น.ส.', 'นาง', 'นาย', 'ดร.', 'พญ.', 'นพ.', 'ทพญ.', 'ทพ.', 'ภญ.', 'ภก.', 'Miss', 'Mrs.', 'Mr.', 'Ms.'];
+function splitName(full) {
+  var s = String(full || '').replace(/[\u200b\u00a0]/g, ' ').replace(/\s+/g, ' ').trim(), t = '';
+  for (var i = 0; i < TITLES.length; i++) if (s.indexOf(TITLES[i]) === 0) { t = TITLES[i]; s = s.slice(t.length).trim(); break; }
+  var p = s.split(' ');
+  return { title: t, first: p[0] || '', last: p.slice(1).join(' '), female: /นาง|หญิง|น\.ส\.|Miss|Mrs|Ms/.test(t) };
+}
+function nameKey(full) { var n = splitName(full); return (n.first + n.last).replace(/[\s.\-_]/g, '').toLowerCase(); }
 function toast(msg, kind, ms) {
   var t = $('#toast'); t.textContent = msg; t.className = 'toast show ' + (kind || '');
   clearTimeout(toast._t); toast._t = setTimeout(function () { t.className = 'toast'; }, ms || (kind === 'bad' ? 6000 : 3600));
@@ -104,24 +122,45 @@ function printWho() { return TG.kind === 'staff' && TG.me ? TG.me.name + ' (' + 
 /** ตั้งค่าหน้ากระดาษ + ข้อความท้ายกระดาษ (Chrome/Edge รุ่น 131 ขึ้นไปพิมพ์ท้ายกระดาษทุกหน้าพร้อมเลขหน้า · เบราว์เซอร์อื่นพิมพ์ข้อความเดียวกันไว้ท้ายเอกสาร) */
 function printSetup(meta) {
   meta = meta || {};
-  var who = printWho(), at = meta.at || now(), txt = (who ? 'พิมพ์โดย ' + who + ' · ' : 'พิมพ์เมื่อ ') + tLong(at) + (meta.code ? ' · รหัสเอกสาร ' + meta.code : '') + ' · SOMDEJ TalentGate';
+  var who = printWho(), at = meta.at || now(), txt = meta.plain ? '' : (who ? 'พิมพ์โดย ' + who + ' · ' : 'พิมพ์เมื่อ ') + tLong(at) + (meta.code ? ' · รหัสเอกสาร ' + meta.code : '') + ' · SOMDEJ TalentGate';
   var q = function (x) { return String(x).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]+/g, ' '); };
   var st = $('#pgStyle'); if (!st) { st = document.createElement('style'); st.id = 'pgStyle'; document.head.appendChild(st); }
+  var ff = 'font-family:"IBM Plex Sans Thai","Anuphan",sans-serif;font-size:7.5pt;color:#333';
   st.textContent = '@page{' + (meta.landscape ? 'size:A4 landscape;' : meta.portrait ? 'size:A4 portrait;' : '') + 'margin:' + (meta.margin || '12mm 12mm 15mm') + ';' +
-    '@bottom-left{content:"' + q(txt) + '";font-family:"IBM Plex Sans Thai","Anuphan",sans-serif;font-size:7.5pt;color:#333}' +
-    '@bottom-right{content:"หน้า " counter(page) " / " counter(pages);font-family:"IBM Plex Sans Thai","Anuphan",sans-serif;font-size:7.5pt;color:#333}}';
+    (meta.plain ? '' : '@bottom-left{content:"' + q(txt) + '";' + ff + '}@bottom-right{content:"หน้า " counter(page) " / " counter(pages);' + ff + '}') + '}';
   var ps = $('#printStamp'); if (ps) ps.textContent = txt;
   PR.meta = meta;
   return txt;
 }
 window.addEventListener('beforeprint', function () { if (!document.body.classList.contains('printing')) printSetup({}); });
-function printDone() { document.body.classList.remove('printing'); var p = $('#printRoot'); if (p) p.innerHTML = ''; PR.meta = null; }
-/** พิมพ์เอกสารที่ระบบจัดรูปให้ (ซ่อนหน้าจอทั้งหมด เหลือเฉพาะเอกสาร) — meta: {landscape, code, at} */
+function printDone() {
+  var was = document.body.classList.contains('printing');
+  document.body.classList.remove('printing'); var p = $('#printRoot'); if (p) { p.innerHTML = ''; p.className = ''; } PR.meta = null;
+  if (was && PR.scroll !== undefined) window.scrollTo(0, PR.scroll);
+}
+/** แสดงเอกสารที่ระบบจัดรูปให้เป็น "ตัวอย่างก่อนพิมพ์" บนจอ (เห็นชัดว่าเป็นเอกสารฉบับใด) แล้วกดพิมพ์จากแถบด้านบน
+ *  ใช้ได้เหมือนกันทุกเบราว์เซอร์ รวม Safari — meta: {landscape, portrait, code, at, title} */
 function printDoc(html, meta) {
-  var p = $('#printRoot'), txt = printSetup(meta || {});
-  p.innerHTML = html + '<p class="pr-stamp">' + esc(txt) + '</p>';
-  document.body.classList.add('printing'); closeModal();
-  setTimeout(function () { window.print(); if (!window.__keepPrint) setTimeout(printDone, 700); }, 120);
+  meta = meta || {};
+  var p = $('#printRoot'), txt = printSetup(meta), bar = $('#printBar');
+  if (!bar) { bar = document.createElement('div'); bar.id = 'printBar'; bar.className = 'noprint'; document.body.insertBefore(bar, p); }
+  if (!document.body.classList.contains('printing')) PR.scroll = window.scrollY;
+  p.className = (meta.landscape ? 'land' : 'port') + (meta.plain ? ' plain' : '');
+  p.innerHTML = html + (txt ? '<p class="pr-stamp">' + esc(txt) + '</p>' : '');
+  bar.innerHTML = '<button class="btn ghost" id="pbX">' + ICON.back + 'กลับ</button><div class="pb-t"><b>' + esc(meta.title || 'ตัวอย่างก่อนพิมพ์') + '</b><small>กระดาษ A4 ' + (meta.landscape ? '<b>แนวนอน</b>' : '<b>แนวตั้ง</b>') + ' · ในหน้าต่างพิมพ์ให้เลือกแนวกระดาษให้ตรง และปิด "หัวกระดาษและท้ายกระดาษ" ของเบราว์เซอร์' + (meta.code ? ' · รหัสเอกสาร ' + esc(meta.code) : '') + '</small></div><button class="btn gold" id="pbP">' + ICON.print + 'พิมพ์ / บันทึกเป็น PDF</button>';
+  document.body.classList.add('printing'); closeModal(); window.scrollTo(0, 0);
+  $('#pbX').onclick = printDone;
+  $('#pbP').onclick = function () { window.print(); };
+}
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('printing') && $('#modal').hidden) printDone(); });
+/** โลโก้หัวกระดาษ: ที่ผู้ดูแลอัปโหลด (เก็บไว้ในเครื่องตามรุ่น) หรือโลโก้ตั้งต้นของระบบ */
+function logoSrc() { return TG.logo || 'logo.png'; }
+function loadLogo() {
+  var ver = (TG.boot || {}).logoVer || '', c = store('tg_logo');
+  if (!ver) { TG.logo = ''; return Promise.resolve(); }
+  if (c && c.ver === ver && c.dataUrl !== undefined) { TG.logo = c.dataUrl; return Promise.resolve(); }
+  if (TG.kind !== 'staff') return Promise.resolve();
+  return api('getLogo', {}, { quiet: true }).then(function (r) { TG.logo = r.dataUrl || ''; store('tg_logo', { ver: ver, dataUrl: TG.logo }); }).catch(function () { });
 }
 
 /* ---------- เรียกหลังบ้าน (ไม่ตั้ง Content-Type เพื่อไม่ให้เกิด preflight) · พร้อมกันไม่เกิน 4 ----------
@@ -132,6 +171,8 @@ var ACT_TH = { loginCand: 'กำลังตรวจสอบรหัสเ�
   saveSet: 'กำลังบันทึกชุดข้อสอบ', saveQuestion: 'กำลังบันทึกข้อสอบ', deleteQuestion: 'กำลังลบข้อสอบ', importQuestions: 'กำลังนำเข้าข้อสอบ', setQuestionsActive: 'กำลังบันทึกการเลือกข้อสอบ', installExtraSets: 'กำลังติดตั้งชุดข้อสอบ',
   saveSettings: 'กำลังบันทึกการตั้งค่า', saveStaff: 'กำลังบันทึกเจ้าหน้าที่', savePosition: 'กำลังบันทึกตำแหน่ง', deletePosition: 'กำลังลบ', deleteExam: 'กำลังลบรอบสอบ', uploadTemplate: 'กำลังอัปโหลดไฟล์โจทย์', saveGrades: 'กำลังบันทึกคะแนน',
   submitSurvey: 'กำลังส่งแบบประเมิน', setExamBlind: 'กำลังบันทึก', clearExamData: 'กำลังล้างข้อมูลซ้อมสอบ', loadTestStart: 'กำลังเตรียมข้อมูลจำลอง', loadTestEnd: 'กำลังลบข้อมูลจำลอง', lookupStaff: 'กำลังค้นหาในระบบ HR', testSmartApi: 'กำลังทดสอบการเชื่อมต่อ', logout: 'กำลังออกจากระบบ',
+  replaceCandidates: 'กำลังจัดเลขประจำตัวสอบใหม่', openBank: 'กำลังปลดล็อกคลังข้อสอบ', saveFillAccept: 'กำลังบันทึกและตรวจคะแนนใหม่', submitProctorSurvey: 'กำลังส่งแบบประเมิน', saveLogo: 'กำลังบันทึกโลโก้', saveExamMeta: 'กำลังบันทึกข้อมูลประกาศ',
+  uploadShare: 'กำลังอัปโหลดไฟล์ประกาศ', closeShare: 'กำลังปิดลิงก์', queueMails: 'กำลังส่งอีเมล', cancelMails: 'กำลังยกเลิก', sendMailsNow: 'กำลังส่งอีเมลที่ค้าง', organizeStorage: 'กำลังจัดระเบียบที่เก็บข้อมูล',
   setInterviewees: 'กำลังบันทึกรายชื่อผู้เข้าสัมภาษณ์', uploadDoc: 'กำลังอัปโหลดเอกสาร', deleteDoc: 'กำลังลบเอกสาร', signoff: 'กำลังยืนยันคะแนน', unlockSignoff: 'กำลังปลดล็อก', logPrint: 'กำลังออกรหัสเอกสาร' };
 function rid_() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 6); }
 /** แถบความคืบหน้าด้านบน (ทุกคำขอ) + ป๊อปอัป "กำลังดำเนินการ" (คำสั่งที่ผู้ใช้กด) — ให้รู้ว่าระบบยังทำงาน ไม่ได้ค้าง */
@@ -152,7 +193,7 @@ function waitUI() {
 }
 function api(action, payload, opt) {
   opt = opt || {};
-  var read = /^(get|bootstrap|ping)/.test(action), tries = opt.tries || 4, rid = rid_(), token = TG.token;
+  var read = /^(get|bootstrap|ping|logBank)/.test(action), tries = opt.tries || 4, rid = rid_(), token = TG.token;
   var fg = !read && !opt.quiet ? { label: opt.label || ACT_TH[action] || 'กำลังดำเนินการ', t0: Date.now(), retry: 0 } : null;
   function soft(msg) { var e = new Error(msg); e.soft = true; return e; }
   function once(n) {
@@ -213,10 +254,11 @@ function topRight() {
   if (TG.kind === 'staff' && TG.me) {
     if (!TG.me.mustChange) {
       h += '<nav class="nav" aria-label="เมนูหลัก"><a href="#/staff" data-nav="staff">รอบสอบ</a>';
-      if (isAdmin()) h += '<a href="#/admin/bank" data-nav="bank">คลังข้อสอบ</a><a href="#/admin/positions" data-nav="positions">ตำแหน่ง</a><a href="#/admin/staff" data-nav="people">เจ้าหน้าที่</a><a href="#/admin/settings" data-nav="settings">ตั้งค่า</a>';
+      if (isAdmin() || isAuthor()) h += '<a href="#/admin/bank" data-nav="bank">คลังข้อสอบ</a>';
+      if (isAdmin()) h += '<a href="#/admin/positions" data-nav="positions">ตำแหน่ง</a><a href="#/admin/staff" data-nav="people">เจ้าหน้าที่</a><a href="#/admin/settings" data-nav="settings">ตั้งค่า</a>';
       h += '</nav>';
     }
-    h += '<div class="who"><span class="who-n">' + esc(TG.me.name) + '</span><span class="who-r">' + (isAdmin() ? 'ผู้ดูแลระบบ' : 'กรรมการสอบ') + ' · ' + esc(TG.me.empCode) + '</span></div>' +
+    h += '<div class="who"><span class="who-n">' + esc(TG.me.name) + '</span><span class="who-r">' + roleLabel() + ' · ' + esc(TG.me.empCode) + '</span></div>' +
       '<button class="icon-btn" id="tbPass" title="เปลี่ยนรหัสผ่าน" aria-label="เปลี่ยนรหัสผ่าน">' + ICON.lock + '</button><button class="icon-btn" id="tbOut" title="ออกจากระบบ" aria-label="ออกจากระบบ">' + ICON.out + '</button>';
   } else if (TG.kind === 'cand' && TG.state) {
     h += '<div class="who"><span class="who-n">' + esc(TG.state.me.name) + '</span><span class="who-r">เลขประจำตัวสอบ ' + esc(no3(TG.state.me.examNo)) + '</span></div>';
@@ -232,6 +274,7 @@ function markNav() {
 }
 function logout() {
   var t = TG.token; api('logout', {}, { keepSession: true, quiet: true, tries: 1 }).catch(function () { });
+  if (typeof bankLock === 'function') bankLock();
   setSession(null); if (t) toast('ออกจากระบบแล้ว'); go('#/');
 }
 
@@ -259,7 +302,7 @@ function viewLogin(tab, msg) {
         '<label>เลขประจำตัวสอบ<input id="lgNo" inputmode="numeric" maxlength="12" placeholder="เช่น 7" required autofocus></label>' +
         '<label>รหัสเข้าสอบ 6 หลัก<input id="lgCode" class="code-in" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="••••••" autocomplete="off" required></label>' +
         '<button class="btn primary block lg" id="lgBtn">เข้าสู่ระบบสอบ</button></form>'
-      : '<form class="form" id="lgF"><h2>สำหรับเจ้าหน้าที่</h2><p class="muted">กรรมการสอบและผู้ดูแลระบบ เข้าด้วยเลขเจ้าหน้าที่ · ครั้งแรกใช้รหัสผ่านชั่วคราวที่ได้รับจากผู้ดูแลระบบ แล้วระบบจะให้ตั้งรหัสใหม่</p>' +
+      : '<form class="form" id="lgF"><h2>สำหรับเจ้าหน้าที่</h2><p class="muted">กรรมการสอบ ผู้ออกข้อสอบ และผู้ดูแลระบบ เข้าด้วยเลขเจ้าหน้าที่ · ครั้งแรกใช้รหัสผ่านชั่วคราวที่ได้รับจากผู้ดูแลระบบ แล้วระบบจะให้ตั้งรหัสใหม่</p>' +
         '<label>เลขเจ้าหน้าที่<input id="lgEmp" inputmode="numeric" maxlength="10" autocomplete="username" required autofocus></label>' +
         '<label>รหัสผ่าน<input id="lgPass" type="password" autocomplete="current-password" required></label>' +
         '<button class="btn primary block lg" id="lgBtn">เข้าสู่ระบบ</button></form>') +
@@ -272,7 +315,7 @@ function viewLogin(tab, msg) {
       : api('loginStaff', { empCode: $('#lgEmp').value.trim(), password: $('#lgPass').value });
     p.then(function (r) {
       if (tab === 'cand') { TG.state = r.state; setSession({ token: r.token, kind: 'cand' }); go('#/exam'); }
-      else { TG.home = r.home; setSession({ token: r.token, kind: 'staff', me: r.me }); go('#/staff'); }
+      else { TG.home = r.home; setSession({ token: r.token, kind: 'staff', me: r.me }); loadLogo(); go('#/staff'); }
     }).catch(function (err) { busy(btn, false); toast(err.message, 'bad'); });
   };
   topRight();
@@ -318,12 +361,14 @@ function go(hash) { if (location.hash === hash) route(); else location.hash = ha
 function route() {
   var parts = location.hash.replace(/^#\/?/, '').split('/').filter(String).map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } });
   if (typeof candLeaving === 'function' && candLeaving(parts)) return;
+  if (document.body.classList.contains('printing')) printDone();
+  if (typeof bankLeave === 'function') bankLeave(parts);
   closeModal(); window.scrollTo(0, 0); enterAnim();
   if (!TG.token) return viewLogin(parts[0] === 'staff' || parts[0] === 'admin' ? 'staff' : (sess('tg_tab') || 'cand'));
   if (TG.kind === 'cand') return candRoute(parts);
   if (TG.me.mustChange) return viewChangePass(true);
   document.body.className = 'pg-staff'; topRight();
-  if (parts[0] === 'admin' && isAdmin()) return adminRoute(parts.slice(1));
+  if (parts[0] === 'admin' && (isAdmin() || (isAuthor() && parts[1] === 'bank'))) return adminRoute(parts.slice(1));
   if (parts[0] === 'staff' && parts[1]) return boardRoute(parts[1], parts[2] || 'overview');
   return viewStaffHome();
 }
@@ -365,6 +410,6 @@ function checkVersion() {
   var cached = store('tg_boot'); if (cached && !TG.boot) { TG.boot = cached; afterBoot(); }
   if (!TG.token) { route(); return; }
   var p = TG.kind === 'cand' ? api('getCandState').then(function (st) { TG.state = st; }) : (TG.me && TG.me.mustChange ? Promise.resolve() : api('getStaffHome').then(function (h) { TG.home = h; TG.me = h.me; }));
-  p.then(function () { topRight(); route(); }).catch(function (e) { if (TG.token) { $('#app').innerHTML = '<div class="wrap narrow"><div class="card pad-xl center"><h2>เชื่อมต่อระบบไม่ได้</h2><p class="muted mt">' + esc(e.message) + '</p><button class="btn primary mt" onclick="location.reload()">ลองอีกครั้ง</button></div></div>'; } });
+  p.then(function () { topRight(); if (TG.kind === 'staff') bootP.then(loadLogo, function () { }); route(); }).catch(function (e) { if (TG.token) { $('#app').innerHTML = '<div class="wrap narrow"><div class="card pad-xl center"><h2>เชื่อมต่อระบบไม่ได้</h2><p class="muted mt">' + esc(e.message) + '</p><button class="btn primary mt" onclick="location.reload()">ลองอีกครั้ง</button></div></div>'; } });
   setInterval(checkVersion, 600000);
 })();

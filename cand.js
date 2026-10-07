@@ -39,11 +39,7 @@ function viewCandHome() {
   if (done) {
     var sv = st.survey && !st.survey.done ? st.survey : null;
     h += '<div class="card done-card"><div class="confetti" aria-hidden="true">' + new Array(15).join('<i></i>') + '</div><div class="done-mark"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" fill="none"/><path d="M15 27l8 8 15-17" fill="none"/></svg></div><h2>ส่งคำตอบครบทุกตอนแล้ว</h2><p class="muted">ระบบบันทึกคำตอบของท่านเรียบร้อย ขอบคุณที่เข้าร่วมการสอบคัดเลือก<br>โรงพยาบาลจะประกาศผลตามช่องทางที่แจ้งไว้</p>' + (sv ? '' : (st.survey && st.survey.done ? '<p class="ok-t sm mt">ขอบคุณสำหรับแบบประเมินความพึงพอใจ</p>' : '') + '<button class="btn primary lg mt" id="cOut">ออกจากระบบ</button>') + '</div>';
-    if (sv) h += '<form class="card survey" id="svF"><span class="eyebrow">ใช้เวลาไม่เกิน 1 นาที</span><h2 class="card-t">แบบประเมินความพึงพอใจการใช้ระบบสอบออนไลน์</h2><p class="card-s">ไม่บังคับ · ไม่ระบุตัวผู้ตอบ · <b>ไม่มีผลต่อคะแนนสอบ</b> — ความเห็นของท่านช่วยให้ฝ่ายทรัพยากรบุคคลปรับปรุงระบบให้ดีขึ้น</p>' +
-      '<div class="sv-scale"><span>1 = น้อยที่สุด</span><span>5 = มากที่สุด</span></div>' + sv.items.map(function (t, i) {
-        return '<div class="sv-q" role="radiogroup" aria-label="' + esc(t) + '"><p><b>' + (i + 1) + '.</b> ' + esc(t) + '</p><div class="sv-r">' + [1, 2, 3, 4, 5].map(function (n) { return '<label><input type="radio" name="sv' + i + '" value="' + n + '"><span>' + n + '</span></label>'; }).join('') + '</div></div>';
-      }).join('') + '<label class="sv-c">ข้อเสนอแนะเพิ่มเติม (ถ้ามี)<textarea id="svC" rows="3" maxlength="1500" placeholder="สิ่งที่ชอบ สิ่งที่ควรปรับปรุง หรือปัญหาที่พบระหว่างสอบ"></textarea></label>' +
-      '<div class="modal-act"><button type="button" class="btn ghost-dark" id="cOut">ข้ามและออกจากระบบ</button><button class="btn primary" id="svS">ส่งแบบประเมิน</button></div></form>';
+    if (sv) h += '<form class="card survey" id="svF">' + surveyInner(sv, 'ข้ามและออกจากระบบ') + '</form>';
   } else if (st.exam.status !== 'OPEN') {
     h += '<div class="note warn">รอบสอบนี้ปิดรับคำตอบแล้ว หากมีข้อสงสัยโปรดติดต่อกรรมการคุมสอบ</div>';
   } else if (!agreed) {
@@ -65,13 +61,13 @@ function viewCandHome() {
   h += '</div>' + (st.contact ? '<p class="muted center sm mt">' + esc(st.contact) + '</p>' : '') + '</div>';
   $('#app').innerHTML = h;
   if ($('#cOut')) $('#cOut').onclick = logout;
-  if ($('#svF')) $('#svF').onsubmit = function (e) {
-    e.preventDefault();
-    var scores = st.survey.items.map(function (t, i) { var x = $('[name=sv' + i + ']:checked'); return x ? Number(x.value) : ''; }), cm = $('#svC').value.trim();
-    if (!cm && scores.every(function (v) { return v === ''; })) return toast('กรุณาให้คะแนนอย่างน้อย 1 ข้อ หรือเขียนข้อเสนอแนะ', 'warn');
-    var b = $('#svS'); busy(b, true, 'กำลังส่ง…');
-    api('submitSurvey', { scores: scores, comment: cm }).then(function () { st.survey.done = true; toast('ขอบคุณสำหรับความเห็นของท่าน', 'ok'); viewCandHome(); window.scrollTo(0, 0); }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); });
-  };
+  if ($('#svF')) bindSurvey($('#svF'), st, function () { viewCandHome(); window.scrollTo(0, 0); });
+  // ป๊อปอัปเชิญทำแบบประเมินทันทีที่ส่งครบทุกตอน (ข้ามได้) — เดิมแบบประเมินอยู่ท้ายหน้า บางคนมองไม่เห็น
+  if (done && st.survey && !st.survey.done && sess('tg_svAsk') !== agKey) {
+    sess('tg_svAsk', agKey);
+    var mb = modal('<div class="sv-pop"><div class="done-mark sm"><svg viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="23" fill="none"/><path d="M15 27l8 8 15-17" fill="none"/></svg></div><h2>ส่งคำตอบครบทุกตอนแล้ว</h2><p class="muted">ขอความร่วมมือทำแบบประเมินการใช้ระบบสอบออนไลน์ เพื่อนำไปพัฒนาระบบต่อไป</p></div><form class="survey in-modal" id="svM">' + surveyInner(st.survey, 'ข้าม') + '</form>', { cls: 'lg' });
+    bindSurvey($('#svM', mb), st, function () { closeModal(); viewCandHome(); window.scrollTo(0, 0); }, function () { closeModal(); });
+  }
   var ag = $('#cAgree'); if (ag) { toggleStart(false); ag.onchange = function () { if (ag.checked) sess('tg_agree', agKey); else sess('tg_agree', null); toggleStart(ag.checked); }; }
   $$('[data-go]').forEach(function (b) { b.onclick = function () { location.hash = '#/exam/' + b.dataset.go; }; });
   $$('[data-start]').forEach(function (b) {
@@ -85,6 +81,23 @@ function viewCandHome() {
     if (TG.view !== 'candHome' || document.hidden) return;
     api('getCandState').then(function (s) { var a = JSON.stringify(TG.state.sections.map(function (x) { return [x.status, x.open, x.dueAt]; })), b = JSON.stringify(s.sections.map(function (x) { return [x.status, x.open, x.dueAt]; })); TG.state = s; if (a !== b || s.exam.status !== st.exam.status) viewCandHome(); }).catch(function () { });
   }, 30000);
+}
+function surveyInner(sv, skipLabel) {
+  return '<span class="eyebrow">ใช้เวลาไม่เกิน 1 นาที</span><h2 class="card-t">แบบประเมินความพึงพอใจการใช้ระบบสอบออนไลน์</h2><p class="card-s">ไม่บังคับ · ไม่ระบุตัวผู้ตอบ · <b>ไม่มีผลต่อคะแนนสอบ</b> — ความเห็นของท่านช่วยให้ฝ่ายทรัพยากรบุคคลปรับปรุงระบบให้ดีขึ้น</p>' +
+    '<div class="sv-scale"><span>1 = น้อยที่สุด</span><span>5 = มากที่สุด</span></div>' + sv.items.map(function (t, i) {
+      return '<div class="sv-q" role="radiogroup" aria-label="' + esc(t) + '"><p><b>' + (i + 1) + '.</b> ' + esc(t) + '</p><div class="sv-r">' + [1, 2, 3, 4, 5].map(function (n) { return '<label><input type="radio" name="sv' + i + '" value="' + n + '"><span>' + n + '</span></label>'; }).join('') + '</div></div>';
+    }).join('') + '<label class="sv-c">ข้อเสนอแนะเพิ่มเติม (ถ้ามี)<textarea class="sv-cm" rows="3" maxlength="1500" placeholder="สิ่งที่ชอบ สิ่งที่ควรปรับปรุง หรือปัญหาที่พบระหว่างสอบ"></textarea></label>' +
+    '<div class="modal-act"><button type="button" class="btn ghost-dark sv-skip"' + (skipLabel === 'ข้ามและออกจากระบบ' ? ' id="cOut"' : '') + '>' + skipLabel + '</button><button class="btn primary sv-send">ส่งแบบประเมิน</button></div>';
+}
+function bindSurvey(form, st, after, skip) {
+  if (skip) $('.sv-skip', form).onclick = skip;
+  form.onsubmit = function (e) {
+    e.preventDefault();
+    var scores = st.survey.items.map(function (t, i) { var x = $('[name=sv' + i + ']:checked', form); return x ? Number(x.value) : ''; }), cm = $('.sv-cm', form).value.trim();
+    if (!cm && scores.every(function (v) { return v === ''; })) return toast('กรุณาให้คะแนนอย่างน้อย 1 ข้อ หรือเขียนข้อเสนอแนะ', 'warn');
+    var b = $('.sv-send', form); busy(b, true, 'กำลังส่ง…');
+    api('submitSurvey', { scores: scores, comment: cm }).then(function () { st.survey.done = true; toast('ขอบคุณสำหรับความเห็นของท่าน', 'ok'); after(); }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); });
+  };
 }
 function toggleStart(on) { $$('[data-start],[data-go]').forEach(function (b) { b.disabled = !on; b.title = on ? '' : 'กรุณาติ๊กรับทราบข้อปฏิบัติก่อน'; }); }
 function flagTags(f) { return String(f || '').split(',').filter(String).map(function (x) { return '<span class="tag ' + (x === 'NOFILE' || x === 'SAME' ? 'bad' : 'warn') + '">' + esc(FLAG_TH[x] || x) + '</span>'; }).join(''); }
@@ -163,18 +176,14 @@ function saveStatus() {
 }
 
 /* ---------- หน้าทำข้อสอบ (ทัศนคติ/ทฤษฎี) ---------- */
-function answered(q) { var v = CAND.ans[q.id]; return q.type === 'ESSAY' ? !!String(v || '').trim() : !!v; }
+function answered(q) { return qDone(q, CAND.ans[q.id]); }
 function countDone() { return CAND.qs.filter(answered).length; }
 function renderRunner() {
   var s = CAND.sec, h = '', lastType = '';
-  var head = { SJT: ['ส่วน ก', 'สถานการณ์ในการทำงาน — เลือกสิ่งที่ท่านจะทำจริงมากที่สุด'], MBTI: ['ส่วน ข', 'ลักษณะของตัวท่าน — เลือกข้อความที่ตรงกับท่านมากกว่า'], MCQ: ['ปรนัย', 'เลือกคำตอบที่ถูกต้องที่สุดเพียงข้อเดียว'], ESSAY: ['ข้อเขียน', 'พิมพ์คำตอบในช่องที่กำหนด'] };
   CAND.qs.forEach(function (q, i) {
-    if (q.type !== lastType) { lastType = q.type; h += '<div class="qgroup"><b>' + head[q.type][0] + '</b><span>' + head[q.type][1] + '</span></div>'; }
-    h += '<article class="q" id="q' + i + '" data-i="' + i + '"><header><span class="qn">ข้อ ' + (i + 1) + '</span>' + (q.points ? '<span class="qp">' + q.points + ' คะแนน</span>' : '') +
-      '<button type="button" class="qflag" data-flag="' + i + '" title="ทำเครื่องหมายเพื่อกลับมาทบทวน">' + ICON.flag + '<span>ทบทวนภายหลัง</span></button></header><div class="qt">' + nl2br(q.text) + '</div>';
-    if (q.type === 'ESSAY') h += '<textarea class="essay" data-q="' + i + '" rows="9" maxlength="6000" placeholder="พิมพ์คำตอบที่นี่" spellcheck="false">' + esc(CAND.ans[q.id] || '') + '</textarea><div class="ecount" id="ec' + i + '"></div>';
-    else h += '<div class="opts">' + q.choices.map(function (c, j) { return '<button type="button" class="opt" data-q="' + i + '" data-v="' + (j + 1) + '"><i>' + (q.type === 'MBTI' ? (j + 1) : TH[j]) + '</i><span>' + esc(c) + '</span></button>'; }).join('') + '</div>';
-    h += '</article>';
+    if (q.type !== lastType) { lastType = q.type; h += '<div class="qgroup"><b>' + (QT_SEC[q.type] || q.type) + '</b><span>' + ((QT[q.type] || {}).hint || '') + '</span></div>'; }
+    h += '<article class="q q-' + q.type + '" id="q' + i + '" data-i="' + i + '"><header><span class="qn">ข้อ ' + (i + 1) + '</span>' + (q.points ? '<span class="qp">' + q.points + ' คะแนน</span>' : '') +
+      '<button type="button" class="qflag" data-flag="' + i + '" title="ทำเครื่องหมายเพื่อกลับมาทบทวน">' + ICON.flag + '<span>ทบทวนภายหลัง</span></button></header>' + qText(q) + qBody(q, i, CAND.ans[q.id]) + '</article>';
   });
   $('#app').innerHTML = '<div class="runner"><div class="rbar"><div class="rb-l"><b>' + esc(s.title) + '</b><span id="rProg"></span></div><div class="rtimer">' + ICON.clock + '<span id="rTime">–</span></div>' +
     '<button class="btn gold" id="rSubmit">ส่งคำตอบ</button></div><div class="rprog"><i id="rBar"></i></div>' +
@@ -182,26 +191,34 @@ function renderRunner() {
     '<aside class="qnav"><h3>ข้อสอบทั้งหมด</h3><div class="qdots" id="qDots">' + CAND.qs.map(function (q, i) { return '<button type="button" data-jump="' + i + '">' + (i + 1) + '</button>'; }).join('') + '</div>' +
     '<div class="legend"><span><i class="lg-a"></i>ตอบแล้ว</span><span><i class="lg-f"></i>ทบทวน</span><span><i class="lg-n"></i>ยังไม่ตอบ</span></div><p class="rsave" id="rSave"></p></aside></div></div>';
   var list = $('.qlist');
+  function setAns(i, v) { var q = CAND.qs[i]; if (v === undefined) return; CAND.ans[q.id] = v; CAND.dirty = true; }
   list.addEventListener('click', function (e) {
-    var o = e.target.closest('.opt'), f = e.target.closest('.qflag');
-    if (o) { var q = CAND.qs[+o.dataset.q]; CAND.ans[q.id] = +o.dataset.v; CAND.dirty = true; localSave(); paintQ(+o.dataset.q); paintNav(); }
-    if (f) { var qq = CAND.qs[+f.dataset.flag]; if (CAND.marks[qq.id]) delete CAND.marks[qq.id]; else CAND.marks[qq.id] = 1; localSave(); paintQ(+f.dataset.flag); paintNav(); }
+    var f = e.target.closest('.qflag'), art = e.target.closest('article.q');
+    if (f) { var qq = CAND.qs[+f.dataset.flag]; if (CAND.marks[qq.id]) delete CAND.marks[qq.id]; else CAND.marks[qq.id] = 1; localSave(); paintQ(+f.dataset.flag); paintNav(); return; }
+    if (!art || !e.target.closest('button')) return;
+    var i = +art.dataset.i, v = qClick(CAND.qs[i], CAND.ans[CAND.qs[i].id], e.target);
+    if (v !== undefined) { setAns(i, v); localSave(); paintQ(i); paintNav(); }
   });
   list.addEventListener('input', function (e) {
-    var t = e.target; if (!t.classList.contains('essay')) return;
-    var q = CAND.qs[+t.dataset.q]; CAND.ans[q.id] = t.value; CAND.dirty = true; ecount(+t.dataset.q);
-    clearTimeout(CAND._et); CAND._et = setTimeout(function () { localSave(); paintNav(); }, 400);
+    var t = e.target, art = t.closest('article.q'); if (!art || t.tagName === 'SELECT') return;
+    var i = +art.dataset.i, v = qInputVal(CAND.qs[i], CAND.ans[CAND.qs[i].id], t); if (v === undefined) return;
+    setAns(i, v); if (t.classList.contains('essay')) ecount(i);
+    clearTimeout(CAND._et); CAND._et = setTimeout(function () { localSave(); paintNav(); art.classList.toggle('answered', answered(CAND.qs[i])); }, 400);
+  });
+  list.addEventListener('change', function (e) {
+    var t = e.target, art = t.closest('article.q'); if (!art || t.tagName !== 'SELECT') return;
+    var i = +art.dataset.i; setAns(i, qInputVal(CAND.qs[i], CAND.ans[CAND.qs[i].id], t)); localSave(); paintQ(i); paintNav();
   });
   ['copy', 'cut', 'paste', 'contextmenu', 'dragstart', 'drop'].forEach(function (ev) { list.addEventListener(ev, function (e) { e.preventDefault(); if (ev === 'paste') toast('ไม่อนุญาตให้วางข้อความในตอนนี้ กรุณาพิมพ์คำตอบด้วยตนเอง', 'warn'); }); });
   $('#qDots').onclick = function (e) { var b = e.target.closest('[data-jump]'); if (b) { var el = $('#q' + b.dataset.jump); window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' }); } };
   $('#rSubmit').onclick = $('#rSubmit2').onclick = askSubmit;
-  CAND.qs.forEach(function (q, i) { paintQ(i); if (q.type === 'ESSAY') ecount(i); });
+  CAND.qs.forEach(function (q, i) { paintQ(i); if (q.type === 'ESSAY' || q.type === 'SHORT') ecount(i); });
   paintNav(); saveStatus();
 }
-function ecount(i) { var el = $('#ec' + i), v = String(CAND.ans[CAND.qs[i].id] || ''); if (el) el.textContent = v.length.toLocaleString() + ' / 6,000 ตัวอักษร'; }
+function ecount(i) { var el = $('#ec' + i), q = CAND.qs[i], v = String(CAND.ans[q.id] || ''); if (el) el.textContent = v.length.toLocaleString() + ' / ' + (q.type === 'SHORT' ? '1,500' : '6,000') + ' ตัวอักษร'; }
 function paintQ(i) {
   var q = CAND.qs[i], el = $('#q' + i); if (!el) return;
-  $$('.opt', el).forEach(function (o) { o.classList.toggle('on', CAND.ans[q.id] === +o.dataset.v); });
+  qPaint(q, i, CAND.ans[q.id], el);
   el.classList.toggle('flagged', !!CAND.marks[q.id]); el.classList.toggle('answered', answered(q));
 }
 function paintNav() {
@@ -211,9 +228,9 @@ function paintNav() {
   $('#rProg').textContent = 'ตอบแล้ว ' + n + ' / ' + N + ' ข้อ'; $('#rBar').style.width = (N ? n / N * 100 : 0) + '%';
 }
 function askSubmit() {
-  var miss = [], mark = []; CAND.qs.forEach(function (q, i) { if (!answered(q)) miss.push(i + 1); if (CAND.marks[q.id]) mark.push(i + 1); });
+  var miss = [], mark = [], part = []; CAND.qs.forEach(function (q, i) { if (!answered(q)) { miss.push(i + 1); if (qPartial(q, CAND.ans[q.id])) part.push(i + 1); } if (CAND.marks[q.id]) mark.push(i + 1); });
   var body = '<p>ตอบแล้ว <b>' + countDone() + ' / ' + CAND.qs.length + '</b> ข้อ · เวลาคงเหลือ <b>' + fmtClock(CAND.due - now()) + '</b></p>' +
-    (miss.length ? '<div class="note warn">ยังไม่ได้ตอบ ' + miss.length + ' ข้อ: ข้อ ' + miss.join(', ') + '</div>' : '<div class="note ok">ตอบครบทุกข้อแล้ว</div>') +
+    (miss.length ? '<div class="note warn">ยังตอบไม่ครบ ' + miss.length + ' ข้อ: ข้อ ' + miss.join(', ') + (part.length ? '<br><small>ข้อ ' + part.join(', ') + ' ตอบไว้บางส่วน (ยังไม่ครบทุกช่อง/ทุกข้อย่อย)</small>' : '') + '</div>' : '<div class="note ok">ตอบครบทุกข้อแล้ว</div>') +
     (mark.length ? '<div class="note info">ทำเครื่องหมายทบทวนไว้: ข้อ ' + mark.join(', ') + '</div>' : '') + '<p class="muted">เมื่อส่งแล้วจะกลับมาแก้ไขคำตอบของตอนนี้ไม่ได้</p>';
   confirmBox('ยืนยันส่งคำตอบ', body, 'ส่งคำตอบ').then(function (y) {
     if (!y) return;
