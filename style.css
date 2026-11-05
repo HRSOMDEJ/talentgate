@@ -716,3 +716,93 @@ body.printing #printRoot>.ann{padding:14mm 20mm 16mm}
   .pb-t small{display:none} body.printing #printBar{gap:8px} #printBar .btn{padding:8px 12px;font-size:14px}
   .rp-g{gap:8px} .optrow{gap:6px}
 }
+
+/* =====================================================================
+   รุ่น 2.1 (6 พ.ย. 2569) — ปุ่มกลับชัดเจน · แถบแท็บ/เมนูเลื่อนได้บนคอม (ลูกศร + ล้อเมาส์) · ไอคอน · แอนิเมชัน
+   ===================================================================== */
+.topbar{background:linear-gradient(100deg,#08142a 0%,var(--navy) 38%,#12295a 100%);box-shadow:0 2px 18px rgba(5,12,28,.35)}
+.topbar::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,rgba(255,77,99,.85) 30%,rgba(217,165,58,.8) 70%,transparent);opacity:.55}
+.nav a{display:inline-flex;align-items:center;gap:6px} .nav a svg{opacity:.8;flex:none} .nav a.active svg{opacity:1;color:var(--red)}
+/* ----- ปุ่มกลับ ----- */
+.backlink{display:inline-flex;align-items:center;gap:9px;padding:6px 16px 6px 6px;margin-bottom:14px;border-radius:999px;background:var(--surface);border:1.5px solid var(--line);color:var(--ink);font-family:var(--head);font-weight:700;font-size:15px;text-decoration:none;box-shadow:var(--sh);transition:border-color .2s,box-shadow .2s,transform .2s}
+.backlink .bl-i,#printBar .bl-i{display:inline-grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.backlink .bl-s{font-weight:500;font-size:13.5px;color:var(--muted)} .backlink .bl-s::before{content:"·";margin:0 6px 0 0}
+.backlink:hover{color:var(--navy);border-color:var(--navy-3);box-shadow:0 6px 18px rgba(11,27,54,.12)} .backlink:hover .bl-i{transform:translateX(-3px)}
+#printBar .btn.back-w{background:#fff;color:var(--navy);padding:6px 18px 6px 6px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.25)} #printBar .btn.back-w .bl-i{width:28px;height:28px}
+#printBar .btn.back-w:hover .bl-i{transform:translateX(-3px)}
+/* ----- แถบเลื่อนแนวนอน (ใช้กับแท็บและเมนูบน) ----- */
+.hs{position:relative;min-width:0;display:flex;align-items:center}
+.hs>.tabs,.hs>.nav{flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;scroll-behavior:smooth;overscroll-behavior-x:contain} .hs>.tabs::-webkit-scrollbar,.hs>.nav::-webkit-scrollbar{display:none}
+.hs-a{position:absolute;top:50%;z-index:3;display:grid;place-items:center;width:34px;height:34px;margin-top:-17px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--navy);box-shadow:0 4px 14px rgba(11,27,54,.18);cursor:pointer;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+.hs-a:hover{transform:scale(1.08)} .hs-l{left:-6px} .hs-r{right:-6px}
+.hs.can-l .hs-l,.hs.can-r .hs-r{opacity:1;pointer-events:auto}
+.hs.can-l>.tabs,.hs.can-l>.nav{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 44px)} .hs.can-r>.tabs,.hs.can-r>.nav{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 44px),transparent)}
+.hs.can-l.can-r>.tabs,.hs.can-l.can-r>.nav{-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 44px,#000 calc(100% - 44px),transparent)}
+.hs.hs-nav{flex:0 1 auto;margin-right:8px} .hs.hs-nav>.nav{margin-right:0} .hs-nav .hs-a{width:28px;height:28px;margin-top:-14px;background:var(--navy-2);color:#fff;border-color:rgba(255,255,255,.2)}
+/* ----- แท็บของรอบสอบ: การ์ดแก้วลอย · ไอคอน · แท็บที่เลือกเป็นเม็ดสีกรมท่า ----- */
+.hs.hs-tabs{margin-bottom:20px;background:rgba(255,255,255,.82);border:1px solid var(--line);border-radius:16px;padding:6px;box-shadow:0 4px 18px rgba(11,27,54,.07)}
+.hs-tabs>.tabs{border-bottom:0;margin:0;gap:4px;padding:1px}
+.hs-tabs .tab{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border:0;margin:0;border-radius:11px;color:var(--ink-2);font-size:14.5px;transition:background .2s,color .2s,box-shadow .2s,transform .15s}
+.hs-tabs .tab svg{flex:none;opacity:.7;transition:opacity .2s,transform .3s}
+.hs-tabs .tab:hover{background:var(--bg-2);color:var(--navy)} .hs-tabs .tab:hover svg{opacity:1;transform:translateY(-1px)}
+.hs-tabs .tab.on{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-3) 100%);color:#fff;box-shadow:0 6px 16px rgba(11,27,54,.28)} .hs-tabs .tab.on svg{opacity:1;color:#ff8a99}
+.hs-tabs .tab::after{display:none}
+@media (min-width:1100px){ .hs-tabs>.tabs{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none!important} .hs-tabs .hs-a{display:none} }
+@media (min-width:900px){ .hs.hs-tabs{position:sticky;top:66px;z-index:20;background:rgba(255,255,255,.96)} }
+#tab.tab-in{animation:tabIn .38s cubic-bezier(.2,.8,.2,1) backwards} @keyframes tabIn{from{opacity:0;transform:translate3d(0,8px,0)}}
+/* ----- การ์ด/ปุ่ม: นูนขึ้นเล็กน้อยเมื่อชี้ ----- */
+.kpi:hover,.excard:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(11,27,54,.14)}
+.card{transition:box-shadow .25s} .btn.primary{background:linear-gradient(135deg,#d8163a,var(--red) 55%,#a50d26)}
+.btn.ghost-dark:hover:not([disabled]){box-shadow:0 4px 12px rgba(11,27,54,.1)}
+/* ----- ผลการคัดเลือก ----- */
+.selbox{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:4px 0 16px}
+.selbox>div{border-radius:14px;padding:12px 14px;background:var(--surface-2);border:1px solid var(--line)} .selbox b{display:block;font-family:var(--head);font-size:26px;line-height:1.15} .selbox span{font-size:13.5px;color:var(--muted)}
+.selbox .s-main{background:linear-gradient(135deg,#e8f6ef,#d3efe1);border-color:#b7e2cb} .selbox .s-main b{color:var(--ok)}
+.selbox .s-res{background:linear-gradient(135deg,#fff6e3,#fdeac2);border-color:#f2d9a0} .selbox .s-res b{color:var(--gold-600)}
+.tag.sel-main{background:var(--ok);color:#fff;border-color:var(--ok)} .tag.sel-res{background:var(--gold-50);color:var(--gold-600);border-color:#efd396} .tag.tie{background:var(--bad-50);color:var(--bad);border-color:#f3c1c8}
+tr.sel-main td{background:#f0faf5} tr.sel-res td{background:#fffaf0}
+/* ----- ผลรายบุคคล ----- */
+.pv-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px} .pv-bar select{min-width:260px;flex:1;max-width:520px}
+.pv-head{display:flex;gap:16px;align-items:center;flex-wrap:wrap} .pv-no{display:grid;place-items:center;width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,var(--navy),var(--navy-3));color:#fff;font-family:var(--head);font-size:24px;font-weight:700;flex:none}
+.pv-head h2{font-size:21px} .pv-sum{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.pv-chip{border-radius:12px;padding:8px 14px;background:var(--surface-2);border:1px solid var(--line);text-align:center;min-width:86px} .pv-chip b{display:block;font-family:var(--head);font-size:20px;line-height:1.2} .pv-chip span{font-size:12.5px;color:var(--muted)}
+.pv-chip.ok b{color:var(--ok)} .pv-chip.bad b{color:var(--bad)} .pv-chip.warn b{color:var(--warn)}
+.pv-sec{margin-top:18px} .pv-sec>header{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px} .pv-sec>header h3{font-size:17px} .pv-sec>header small{color:var(--muted)}
+.pvbar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line-2);margin:6px 0 12px} .pvbar i{display:block;height:100%} .pvbar .r{background:var(--ok)} .pvbar .p{background:var(--gold)} .pvbar .w{background:var(--bad)} .pvbar .b{background:#b9c2d3}
+.pvt td{vertical-align:top} .pvt .q{min-width:300px;max-width:440px} .pvt .q small{display:block;color:var(--muted);font-size:12.5px} .pvt .ans div,.pvt .key div{white-space:pre-wrap}
+.pvt .ans.long{max-height:220px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:6px 8px;font-size:14px}
+.okc{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:15px} .okc.y{background:var(--ok-50);color:var(--ok)} .okc.n{background:var(--bad-50);color:var(--bad)} .okc.p{background:var(--gold-50);color:var(--gold-600)} .okc.e{background:var(--line-2);color:var(--muted)} .okc.m{background:var(--info-50);color:var(--info);font-size:12px;width:auto;padding:0 8px;border-radius:99px}
+.pvt tr.wrong td{background:#fff7f8} .pvt tr.right td{background:#fbfefc}
+.pvfilter{display:flex;gap:6px;flex-wrap:wrap} .pvfilter .chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+/* ----- เลือกข้อสอบรายข้อ ----- */
+.pk-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px} .pk-head .srch{flex:1;min-width:200px;margin:0}
+.pk-sum{position:sticky;top:0;z-index:2;display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 14px;margin:0 0 10px;border-radius:12px;background:var(--navy);color:#fff} .pk-sum b{font-family:var(--head);font-size:20px} .pk-sum .sp{flex:1}
+.pk-list{max-height:min(58vh,560px);overflow:auto;padding-right:4px}
+.pk-set{border:1px solid var(--line);border-radius:14px;margin-bottom:10px;overflow:hidden} .pk-set>header{display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--surface-2);cursor:pointer} .pk-set>header b{flex:1} .pk-set>header small{color:var(--muted)}
+.pk-set>header .pk-n{font-weight:700;color:var(--navy);background:#fff;border:1px solid var(--line);border-radius:99px;padding:1px 10px;font-size:13px}
+.pk-set.open>header{border-bottom:1px solid var(--line)} .pk-set:not(.open) .pk-qs{display:none}
+.pk-q{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:start;padding:8px 14px;border-top:1px solid var(--line-2);cursor:pointer;transition:background .15s} .pk-q:first-child{border-top:0}
+.pk-q:hover{background:#f6f8fc} .pk-q.on{background:#eef4ff} .pk-q.off{opacity:.65} .pk-q .t{font-size:14.5px;line-height:1.5} .pk-q .m{white-space:nowrap;font-size:12.5px;color:var(--muted);text-align:right}
+.pk-q input{width:18px;height:18px;margin-top:3px}
+.secpick{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--info-50);margin:8px 0} .secpick b{color:var(--info)}
+/* ----- ค่าตั้งการคัดเลือก ----- */
+.cfg-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ivconf{font-size:12.5px} .ivconf.y{color:var(--ok)} .ivconf.n{color:var(--bad)}
+@media (max-width:900px){ .selbox{grid-template-columns:repeat(2,minmax(0,1fr))} .cfg-g{grid-template-columns:1fr} .backlink .bl-s{display:none} }
+@media (max-width:620px){ .hs-tabs .tab{padding:8px 11px;font-size:14px} .hs-tabs .tab span{white-space:nowrap} .pv-sum{margin-left:0} .pvt .q{max-width:none} }
+@media print{ .hs-a{display:none!important} .hs.hs-tabs{display:none!important} }
+/* ----- เอกสาร: รายงานรายข้อ + ข้อสอบฉบับพิมพ์ ----- */
+.cr-t{width:100%;border-collapse:collapse;font-size:9.5pt;margin:2mm 0 4mm} .cr-t th,.cr-t td{border:.5pt solid #777;padding:1.2mm 1.6mm;vertical-align:top;text-align:left} .cr-t th{background:#eee;font-weight:600}
+.cr-t td.c,.cr-t th.c{text-align:center} .cr-t .mk{font-weight:700;font-size:11pt} .cr-t .q{width:40%} .cr-t small{color:#444}
+.cr-h{display:flex;justify-content:space-between;gap:4mm;align-items:flex-start;border:.6pt solid #333;border-radius:2mm;padding:2.5mm 3.5mm;margin:2mm 0 3mm;font-size:10pt} .cr-h b{font-size:12pt}
+.cr-s{font-size:11pt;font-weight:700;margin:4mm 0 1mm;border-bottom:1pt solid #000;padding-bottom:1mm}
+.pp-h{text-align:center;margin-bottom:3mm} .pp-h h1{font-size:15pt;margin:1mm 0} .pp-h p{font-size:10.5pt;margin:0}
+.pp-id{display:flex;gap:8mm;justify-content:space-between;border:.6pt solid #000;padding:2.5mm 4mm;font-size:11pt;margin:3mm 0}
+.pp-sec{font-size:12pt;font-weight:700;margin:5mm 0 1mm;padding:1.5mm 3mm;background:#e9e9e9;border-left:3pt solid #000} .pp-ins{font-size:10pt;white-space:pre-wrap;margin:1mm 0 2mm}
+.pp-q{break-inside:avoid;margin:2.6mm 0;font-size:10.5pt} .pp-q .qt{white-space:pre-wrap} .pp-q ol{list-style:none;margin:1mm 0 0;padding-left:6mm;display:grid;gap:.6mm} .pp-q ol.c2{grid-template-columns:1fr 1fr}
+.pp-key{margin-top:1mm;padding:1mm 2.5mm;border-left:2pt solid #000;background:#f0f0f0;font-size:9.5pt;white-space:pre-wrap}
+.pp-lines div{border-bottom:.4pt dotted #555;height:7.5mm}
+.pp-tf{border-collapse:collapse;margin-top:1mm} .pp-tf td{border:.4pt solid #777;padding:.8mm 2mm;font-size:10pt}
+.pk-head select{width:auto;flex:none;max-width:240px} .pk-head .chk{flex:none;margin:0}
+@media (max-width:1020px){ body.pg-staff .hs.hs-nav{order:5;flex-basis:100%;margin:4px 0 0} body.pg-staff .hs-nav>.nav{order:0;flex-basis:auto;margin:0} }
+@media (max-width:620px){ .nav a{padding:6px 11px;font-size:14px} .pv-bar select{min-width:0;width:100%;order:-1;flex-basis:100%} }

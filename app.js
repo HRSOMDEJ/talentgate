@@ -2,7 +2,7 @@
    SOMDEJ TalentGate · app.js — แกนกลาง · เข้าสู่ระบบ · ตัวช่วยที่ใช้ร่วมกัน
    BUILD ต้องตรงกัน 3 ที่: Config.gs · app.js (TG_BUILD) · version.json (+ ?v= ใน index.html)
    ===================================================================== */
-var TG_BUILD = '2569-10-07.1';
+var TG_BUILD = '2569-11-06.1';
 var TG = { boot: null, token: null, kind: null, me: null, home: null, state: null, offset: 0, view: null };
 
 /* ---------- ตัวช่วยทั่วไป ---------- */
@@ -65,6 +65,43 @@ var ICON = {
   file: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg>',
   shield: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.4 8.3-8 9-4.6-.7-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>'
 };
+
+/** ไอคอนแท็บ/เมนู (รุ่น 2.1) — เส้นบาง 2px ขนาด 17px */
+var TI = (function () {
+  var w = function (d) { return '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>'; };
+  return {
+    overview: w('<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'),
+    monitor: w('<path d="M2 12h4l3-8 4 16 3-8h6"/>'),
+    essay: w('<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>'),
+    practical: w('<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7 9l3 2-3 2M13 13h4"/>'),
+    profile: w('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+    interview: w('<path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/><path d="M8.5 11h.01M12 11h.01M15.5 11h.01"/>'),
+    results: w('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>'),
+    person: w('<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><path d="M8 17a4 4 0 0 1 8 0"/>'),
+    reports: w('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-2"/>'),
+    survey: w('<path d="M12 3l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.4 6.8 19.2l1-5.9L3.5 9.2l5.9-.8z"/>'),
+    cands: w('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5"/>'),
+    mail: w('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>'),
+    setup: w('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+    bank: w('<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M8 7h8M8 11h6"/>'),
+    pos: w('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18"/>'),
+    exams: w('<path d="M9 4h6v3H9zM7 5H5v16h14V5h-2"/><path d="M8.5 13l2.5 2.5 4.5-5"/>')
+  };
+})();
+/** แถบเลื่อนแนวนอน (แท็บ/เมนู): ปุ่มลูกศรซ้าย-ขวาเมื่อเนื้อหายาวเกินจอ · ล้อเมาส์เลื่อนแนวนอน · เลื่อนแท็บที่เลือกให้อยู่ในจอ */
+function hscroll(el) {
+  if (!el || el._hs) return; el._hs = 1;
+  var box = document.createElement('div'); box.className = 'hs ' + (el.dataset.hs || '');
+  el.parentNode.insertBefore(box, el); box.appendChild(el);
+  var mk = function (dir) { var b = document.createElement('button'); b.type = 'button'; b.className = 'hs-a hs-' + dir; b.setAttribute('aria-label', dir === 'l' ? 'เลื่อนไปทางซ้าย' : 'เลื่อนไปทางขวา'); b.innerHTML = dir === 'l' ? ICON.back : '<span style="display:inline-flex;transform:scaleX(-1)">' + ICON.back + '</span>'; b.onclick = function () { el.scrollBy({ left: (dir === 'l' ? -1 : 1) * Math.max(160, el.clientWidth * .7), behavior: 'smooth' }); }; box.appendChild(b); return b; };
+  mk('l'); mk('r');
+  var upd = function () { var max = el.scrollWidth - el.clientWidth; box.classList.toggle('can-l', el.scrollLeft > 4); box.classList.toggle('can-r', el.scrollLeft < max - 4); };
+  el.addEventListener('scroll', upd, { passive: true });
+  el.addEventListener('wheel', function (ev) { if (el.scrollWidth <= el.clientWidth + 2 || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) return; ev.preventDefault(); el.scrollLeft += ev.deltaY; }, { passive: false });
+  if (window.ResizeObserver) new ResizeObserver(upd).observe(el); else window.addEventListener('resize', upd);
+  var on = el.querySelector('.on,.active'); if (on && on.scrollIntoView && el.scrollWidth > el.clientWidth + 2) { var x = on.offsetLeft - (el.clientWidth - on.offsetWidth) / 2; el.scrollLeft = Math.max(0, x); }
+  setTimeout(upd, 60); upd();
+}
 
 /* ---------- กล่องโต้ตอบ (อยู่ใน body เสมอ) ---------- */
 function modal(html, opt) {
@@ -147,7 +184,7 @@ function printDoc(html, meta) {
   if (!document.body.classList.contains('printing')) PR.scroll = window.scrollY;
   p.className = (meta.landscape ? 'land' : 'port') + (meta.plain ? ' plain' : '');
   p.innerHTML = html + (txt ? '<p class="pr-stamp">' + esc(txt) + '</p>' : '');
-  bar.innerHTML = '<button class="btn ghost" id="pbX">' + ICON.back + 'กลับ</button><div class="pb-t"><b>' + esc(meta.title || 'ตัวอย่างก่อนพิมพ์') + '</b><small>กระดาษ A4 ' + (meta.landscape ? '<b>แนวนอน</b>' : '<b>แนวตั้ง</b>') + ' · ในหน้าต่างพิมพ์ให้เลือกแนวกระดาษให้ตรง และปิด "หัวกระดาษและท้ายกระดาษ" ของเบราว์เซอร์' + (meta.code ? ' · รหัสเอกสาร ' + esc(meta.code) : '') + '</small></div><button class="btn gold" id="pbP">' + ICON.print + 'พิมพ์ / บันทึกเป็น PDF</button>';
+  bar.innerHTML = '<button class="btn back-w" id="pbX"><span class="bl-i">' + ICON.back + '</span>กลับ</button><div class="pb-t"><b>' + esc(meta.title || 'ตัวอย่างก่อนพิมพ์') + '</b><small>กระดาษ A4 ' + (meta.landscape ? '<b>แนวนอน</b>' : '<b>แนวตั้ง</b>') + ' · ในหน้าต่างพิมพ์ให้เลือกแนวกระดาษให้ตรง และปิด "หัวกระดาษและท้ายกระดาษ" ของเบราว์เซอร์' + (meta.code ? ' · รหัสเอกสาร ' + esc(meta.code) : '') + '</small></div><button class="btn gold" id="pbP">' + ICON.print + 'พิมพ์ / บันทึกเป็น PDF</button>';
   document.body.classList.add('printing'); closeModal(); window.scrollTo(0, 0);
   $('#pbX').onclick = printDone;
   $('#pbP').onclick = function () { window.print(); };
@@ -253,9 +290,9 @@ function topRight() {
   var el = $('#topRight'), h = '';
   if (TG.kind === 'staff' && TG.me) {
     if (!TG.me.mustChange) {
-      h += '<nav class="nav" aria-label="เมนูหลัก"><a href="#/staff" data-nav="staff">รอบสอบ</a>';
-      if (isAdmin() || isAuthor()) h += '<a href="#/admin/bank" data-nav="bank">คลังข้อสอบ</a>';
-      if (isAdmin()) h += '<a href="#/admin/positions" data-nav="positions">ตำแหน่ง</a><a href="#/admin/staff" data-nav="people">เจ้าหน้าที่</a><a href="#/admin/settings" data-nav="settings">ตั้งค่า</a>';
+      h += '<nav class="nav" aria-label="เมนูหลัก" data-hs="hs-nav"><a href="#/staff" data-nav="staff">' + TI.exams + '<span>รอบสอบ</span></a>';
+      if (isAdmin() || isAuthor()) h += '<a href="#/admin/bank" data-nav="bank">' + TI.bank + '<span>คลังข้อสอบ</span></a>';
+      if (isAdmin()) h += '<a href="#/admin/positions" data-nav="positions">' + TI.pos + '<span>ตำแหน่ง</span></a><a href="#/admin/staff" data-nav="people">' + TI.cands + '<span>เจ้าหน้าที่</span></a><a href="#/admin/settings" data-nav="settings">' + TI.setup + '<span>ตั้งค่า</span></a>';
       h += '</nav>';
     }
     h += '<div class="who"><span class="who-n">' + esc(TG.me.name) + '</span><span class="who-r">' + roleLabel() + ' · ' + esc(TG.me.empCode) + '</span></div>' +
@@ -266,7 +303,7 @@ function topRight() {
   el.innerHTML = h;
   if ($('#tbOut')) $('#tbOut').onclick = function () { confirmBox('ออกจากระบบ', 'ต้องการออกจากระบบใช่หรือไม่', 'ออกจากระบบ').then(function (y) { if (y) logout(); }); };
   if ($('#tbPass')) $('#tbPass').onclick = function () { viewChangePass(false); };
-  markNav();
+  markNav(); hscroll($('.nav', el));
 }
 function markNav() {
   var p = location.hash.replace(/^#\/?/, '').split('/'), key = p[0] === 'admin' ? ({ staff: 'people' }[p[1]] || p[1]) : 'staff';

@@ -49,7 +49,7 @@ function viewCandHome() {
   h += '<h2 class="sec-h">ตอนสอบ</h2><div class="steps">';
   secs.forEach(function (s, i) {
     var cur = next && next.secId === s.secId, stTxt, cls = s.status === 'DONE' ? 'done' : s.status === 'DOING' ? 'doing' : cur ? 'cur' : 'lock', btn = '';
-    if (s.status === 'DONE') stTxt = '<span class="tag ok">ส่งแล้ว ' + tTime(s.submitAt) + ' น.</span>' + flagTags(s.flag);
+    if (s.status === 'DONE') stTxt = '<span class="tag ok">ส่งแล้ว ' + tTime(s.submitAt) + ' น.</span>' + flagTags(s.flag) + (s.score !== undefined ? ' <span class="tag info">คะแนนส่วนที่ระบบตรวจ ' + num(s.score) + ' / ' + num(s.scoreMax) + (s.scorePending ? ' · ข้อเขียนรอกรรมการตรวจ' : '') + '</span>' : '');
     else if (s.status === 'DOING') { stTxt = '<span class="tag warn">กำลังทำ · เหลือเวลา ' + fmtClock(s.dueAt - now()) + '</span>'; btn = '<button class="btn primary" data-go="' + esc(s.secId) + '">ทำต่อ</button>'; }
     else if (cur && st.exam.status === 'OPEN') {
       if (!s.open) stTxt = '<span class="tag">รอกรรมการเปิดให้เริ่ม</span>';

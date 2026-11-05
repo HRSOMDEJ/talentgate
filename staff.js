@@ -5,6 +5,7 @@ var BD = { id: null, data: null, at: 0, tab: null, essays: null, mon: null, monT
 var ST_TH = { DRAFT: 'ร่าง', OPEN: 'เปิดสอบ', GRADING: 'ปิดรับคำตอบ · กำลังตรวจ', FINAL: 'ยืนยันผลแล้ว' };
 var CS_TH = { ACTIVE: 'มีสิทธิ์สอบ', WITHDRAWN: 'สละสิทธิ์', ABSENT: 'ขาดสอบ', BLOCKED: 'ระงับสิทธิ์' };
 var TYPE_TH = { PROFILE: 'ทัศนคติ/บุคลิกภาพ', THEORY: 'ทฤษฎี', PRACTICAL: 'ปฏิบัติ (ส่งไฟล์)' };
+var TAB_TIP = { overview: 'สถานะรอบสอบและขั้นตอน', monitor: 'ผู้เข้าสอบที่กำลังทำข้อสอบ', essay: 'ให้คะแนนข้อเขียน', practical: 'ให้คะแนนภาคปฏิบัติ', profile: 'ผลทัศนคติและบุคลิกภาพ', interview: 'ให้คะแนนสัมภาษณ์', results: 'คะแนนและผลการคัดเลือก', person: 'คำตอบรายข้อของผู้เข้าสอบแต่ละคน', reports: 'พิมพ์รายงานและประกาศ', survey: 'แบบประเมินความพึงพอใจ', cands: 'รายชื่อผู้เข้าสอบ', mail: 'ประกาศและอีเมลถึงผู้สมัคร', setup: 'ตั้งค่ารอบสอบ' };
 var DUTY_TH = { PROCTOR: 'คุมสอบ', WRITTEN: 'ตรวจข้อเขียน', PRACTICAL: 'ตรวจภาคปฏิบัติ', IV: 'สัมภาษณ์' }, DUTY_KEYS = ['PROCTOR', 'WRITTEN', 'PRACTICAL', 'IV'];
 function dutyTags(a, cls) { return DUTY_KEYS.filter(function (k) { return (a || []).indexOf(k) >= 0; }).map(function (k) { return '<span class="tag du du-' + k + (cls ? ' ' + cls : '') + '">' + DUTY_TH[k] + '</span>'; }).join(''); }
 function stPill(s) { return '<span class="st st-' + s + '">' + ST_TH[s] + '</span>'; }
@@ -47,7 +48,7 @@ function loadBoard(quiet) {
     .catch(function (e) { toast(e.message, 'bad'); if (!BD.data) { location.hash = '#/staff'; } });
 }
 /** ไม่วาดหน้าใหม่ทับขณะกรรมการกำลังพิมพ์คะแนน */
-function editingNow() { var a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest && a.closest('#tab') && (BD.tab === 'essay' || BD.tab === 'practical' || BD.tab === 'setup' || BD.tab === 'cands' || BD.tab === 'interview' || BD.tab === 'mail' || BD.tab === 'survey' || BD.tab === 'reports'); }
+function editingNow() { var a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest && a.closest('#tab') && (BD.tab === 'essay' || BD.tab === 'person' || BD.tab === 'practical' || BD.tab === 'setup' || BD.tab === 'cands' || BD.tab === 'interview' || BD.tab === 'mail' || BD.tab === 'survey' || BD.tab === 'reports'); }
 function drawBoard() {
   var d = BD.data, e = d.exam, can = d.can || {}, boss = d.isAdmin || d.isHr, tabs = [['overview', 'ภาพรวม'], ['monitor', 'ติดตามสอบ']];
   // แท็บตามหน้าที่: กรรมการเห็นเฉพาะส่วนที่ได้รับมอบ · ผู้ดูแลและ HR เห็นทุกส่วน (HR ดูได้ ให้คะแนนไม่ได้)
@@ -55,16 +56,19 @@ function drawBoard() {
   if (boss || can.practical) tabs.push(['practical', 'ตรวจภาคปฏิบัติ']);
   if (can.scores) tabs.push(['profile', 'ทัศนคติและบุคลิกภาพ']);
   if (boss || can.iv) tabs.push(['interview', 'สัมภาษณ์']);
-  if (can.scores) tabs.push(['results', 'สรุปผล'], ['reports', 'รายงาน']);
+  if (can.scores) tabs.push(['results', 'สรุปผล']);
+  if (boss) tabs.push(['person', 'ผลรายบุคคล']);
+  if (can.scores) tabs.push(['reports', 'รายงาน']);
   tabs.push(['survey', 'ความพึงพอใจ']);
   if (d.isAdmin) tabs.push(['cands', 'ผู้เข้าสอบ'], ['mail', 'ประกาศและอีเมล'], ['setup', 'ตั้งค่ารอบสอบ']);
   if (!tabs.some(function (t) { return t[0] === BD.tab; })) BD.tab = 'overview';
-  $('#app').innerHTML = '<div class="wrap"><a class="backlink" href="#/staff">' + ICON.back + 'รอบสอบทั้งหมด</a><div class="phead"><div><span class="eyebrow">' + esc(e.posName) + '</span><h1>' + esc(e.title) + '</h1><p class="muted">' + esc(e.examDate) + (e.place ? ' · ' + esc(e.place) : '') + '</p></div>' +
+  $('#app').innerHTML = '<div class="wrap"><a class="backlink" href="#/staff"><span class="bl-i">' + ICON.back + '</span>กลับ<span class="bl-s">ไปหน้ารอบสอบทั้งหมด</span></a><div class="phead"><div><span class="eyebrow">' + esc(e.posName) + '</span><h1>' + esc(e.title) + '</h1><p class="muted">' + esc(e.examDate) + (e.place ? ' · ' + esc(e.place) : '') + '</p></div>' +
     '<div class="phead-r">' + stPill(e.status) + '<button class="icon-btn dark" id="bdRef" title="โหลดข้อมูลใหม่" aria-label="โหลดข้อมูลใหม่">' + ICON.refresh + '</button></div></div>' +
-    '<div class="tabs" role="tablist">' + tabs.map(function (t) { return '<a class="tab' + (t[0] === BD.tab ? ' on' : '') + '" href="#/staff/' + encodeURIComponent(e.examId) + '/' + t[0] + '">' + t[1] + '</a>'; }).join('') + '</div><div id="tab"></div></div>';
+    '<div class="tabs" role="tablist" data-hs="hs-tabs">' + tabs.map(function (t) { return '<a class="tab' + (t[0] === BD.tab ? ' on' : '') + '" role="tab" aria-selected="' + (t[0] === BD.tab) + '" title="' + esc(TAB_TIP[t[0]] || '') + '" href="#/staff/' + encodeURIComponent(e.examId) + '/' + t[0] + '">' + (TI[t[0]] || '') + '<span>' + t[1] + '</span></a>'; }).join('') + '</div><div id="tab" class="tab-in"></div></div>';
+  hscroll($('.tabs'));
   $('#bdRef').onclick = function () { var b = this; b.classList.add('spinning'); BD.essays = null; loadBoard().then(function () { b.classList.remove('spinning'); toast('โหลดข้อมูลล่าสุดแล้ว', 'ok'); }); };
   proctorAsk();
-  ({ overview: tabOverview, monitor: tabMonitor, essay: tabEssay, practical: tabPractical, profile: tabProfile, results: tabResults, survey: tabSurvey, cands: tabCands, setup: tabSetup, interview: tabInterview, reports: tabReports, mail: tabMail })[BD.tab]();
+  ({ overview: tabOverview, monitor: tabMonitor, essay: tabEssay, practical: tabPractical, profile: tabProfile, results: tabResults, person: tabPerson, survey: tabSurvey, cands: tabCands, setup: tabSetup, interview: tabInterview, reports: tabReports, mail: tabMail })[BD.tab]();
   countUp($('#tab'));
 }
 /** ป้ายผู้เข้าสอบ — ในหน้าตรวจ (grading) ถ้ารอบนี้ตั้ง "ปิดชื่อ" จะแสดงเฉพาะเลขประจำตัวสอบ แม้เป็นผู้ดูแล */
@@ -491,24 +495,27 @@ function tabResults() {
     '<div class="kpi"><b>' + (tot.length ? num(tot.reduce(function (a, b) { return a + b; }, 0) / tot.length, 1) : '–') + '</b><span>คะแนนเฉลี่ย</span><small>จากเต็ม ' + t.totalMax + '</small></div><div class="kpi"><b>' + (tot.length ? num(Math.max.apply(null, tot)) : '–') + '</b><span>คะแนนสูงสุด</span><small>ต่ำสุด ' + (tot.length ? num(Math.min.apply(null, tot)) : '–') + '</small></div></div>';
   h += '<div class="card"><div class="card-head"><div><h2 class="card-t">ผลคะแนนเรียงตามลำดับ</h2><p class="card-s">' + (iv ? '<b>คะแนนรวม</b> (เต็ม 100) = คะแนนสอบ ' + (100 - d.exam.ivWeight) + '% + สัมภาษณ์ ' + d.exam.ivWeight + '% · เกณฑ์ผ่านร้อยละ ' + d.exam.passPct + ' ของคะแนนรวม · ' : '') + 'คะแนนข้อเขียน' + (iv ? ' ภาคปฏิบัติ และสัมภาษณ์' : 'และภาคปฏิบัติ') + 'เป็นค่าเฉลี่ยของกรรมการ · คะแนนเท่ากันให้ผู้ได้ภาคปฏิบัติสูงกว่าอยู่ลำดับดีกว่า' + (done.length < nStart ? ' · <b>ยังตรวจไม่ครบ ' + (nStart - done.length) + ' คน ลำดับอาจเปลี่ยน</b>' : '') + '</p></div><div class="acts noprint">' +
     (d.isAdmin ? '<button class="btn ghost-dark sm" id="rsItem">วิเคราะห์ข้อสอบรายข้อ</button>' + (readonly() ? '' : '<button class="btn ghost-dark sm" id="rsRe">ตรวจข้อที่ระบบตรวจใหม่</button>') : '') + '<button class="btn ghost-dark sm" id="rsCsv">' + ICON.down + 'ส่งออก CSV</button><a class="btn ghost-dark sm" id="rsPrint" href="#/staff/' + encodeURIComponent(d.exam.examId) + '/reports">' + ICON.print + 'พิมพ์รายงาน</a></div></div>';
+  var sOn = selOn();
+  h = h.replace('<div class="card"><div class="card-head"><div><h2 class="card-t">ผลคะแนนเรียงตามลำดับ</h2>', selSummary() + '<div class="card"><div class="card-head"><div><h2 class="card-t">ผลคะแนนเรียงตามลำดับ</h2>');
   if (!list.length) h += '<p class="muted">ยังไม่มีผู้เข้าสอบเริ่มทำข้อสอบ</p>';
-  else h += '<div class="tblwrap"><table class="tbl res"><thead><tr><th class="c">ลำดับ</th><th>ผู้เข้าสอบ</th><th class="r">ระบบตรวจ<small>/' + mcqMax + '</small></th>' + (hasEssay ? '<th class="r">ข้อเขียน<small>/' + (t.theoryMax - mcqMax) + '</small></th>' : '') + (hasPr ? '<th class="r">ทฤษฎีรวม<small>/' + t.theoryMax + '</small></th><th class="r">ปฏิบัติ<small>/' + t.practMax + '</small></th>' : '') + '<th class="r">' + (iv ? 'รวมสอบ' : 'รวม') + '<small>/' + t.totalMax + '</small></th><th>' + (iv ? 'ผลสอบ' : 'ผล') + '</th>' + (iv ? '<th class="r">สัมภาษณ์<small>/' + d.ivMax + '</small></th><th class="r">คะแนนรวม<small>/100</small></th><th>ผลรวม</th>' : '') + (hasProf ? '<th class="c">ทัศนคติ<small>/4 · ไม่คิดคะแนน</small></th><th class="c">บุคลิกภาพ</th>' : '') + '<th>หมายเหตุ</th></tr></thead><tbody>' +
+  else h += '<div class="tblwrap"><table class="tbl res"><thead><tr><th class="c">ลำดับ</th><th>ผู้เข้าสอบ</th><th class="r">ระบบตรวจ<small>/' + mcqMax + '</small></th>' + (hasEssay ? '<th class="r">ข้อเขียน<small>/' + (t.theoryMax - mcqMax) + '</small></th>' : '') + (hasPr ? '<th class="r">ทฤษฎีรวม<small>/' + t.theoryMax + '</small></th><th class="r">ปฏิบัติ<small>/' + t.practMax + '</small></th>' : '') + '<th class="r">' + (iv ? 'รวมสอบ' : 'รวม') + '<small>/' + t.totalMax + '</small></th><th>' + (iv ? 'ผลสอบ' : 'ผล') + '</th>' + (iv ? '<th class="r">สัมภาษณ์<small>/' + d.ivMax + '</small></th><th class="r">คะแนนรวม<small>/100</small></th><th>ผลรวม</th>' : '') + (sOn ? '<th>ผลการคัดเลือก</th>' : '') + (hasProf ? '<th class="c">ทัศนคติ<small>/4 · ไม่คิดคะแนน</small></th><th class="c">บุคลิกภาพ</th>' : '') + '<th>หมายเหตุ</th></tr></thead><tbody>' +
     list.map(function (c) {
       var r = c.result, fl = []; Object.keys(c.secs).forEach(function (k) { String(c.secs[k].flag || '').split(',').filter(String).forEach(function (f) { if (fl.indexOf(f) < 0) fl.push(f); }); });
       var bl = Object.keys(c.secs).reduce(function (a, k) { return a + (c.secs[k].blur || 0); }, 0);
       var f = c.final, rk = iv ? (f && f.rank) : r.rank, rowCls = iv ? (f && f.complete ? (f.pass ? 'pass' : 'fail') : '') : (r.complete ? (r.pass ? 'pass' : 'fail') : '');
+      if (sOn && c.sel) rowCls += c.sel.st === 'MAIN' ? ' sel-main' : c.sel.st === 'RESERVE' ? ' sel-res' : '';
       return '<tr class="' + rowCls + '"><td class="c"><span class="rank' + (rk && rk <= 3 ? ' top' : '') + '">' + (rk || '–') + '</span></td><td>' + cLabel(c) + '</td><td class="r">' + num(r.mcq) + '</td>' + (hasEssay ? '<td class="r">' + num(r.essay) + '</td>' : '') + (hasPr ? '<td class="r">' + num(r.theory) + '</td><td class="r">' + num(r.practical) + '</td>' : '') +
         '<td class="r"><b class="tot">' + num(r.total) + '</b></td><td>' + (!r.started ? '<span class="tag">ไม่ได้เข้าสอบ</span>' : r.complete ? (r.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอตรวจ</span>') + '</td>' +
-        (iv ? '<td class="r">' + (c.iv ? num(f.iv !== null ? f.iv : f.ivPart) + (f.iv === null && f.ivPart !== null ? '*' : '') : '<span class="muted">–</span>') + '</td><td class="r"><b class="tot">' + (f && f.score !== null ? num(f.score) : '–') + '</b></td><td>' + (!c.iv ? '<span class="tag">ไม่ได้สัมภาษณ์</span>' : f.complete ? (f.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอคะแนน</span>') + '</td>' : '') +
+        (iv ? '<td class="r">' + (c.iv ? num(f.iv !== null ? f.iv : f.ivPart) + (f.iv === null && f.ivPart !== null ? '*' : '') : '<span class="muted">–</span>') + '</td><td class="r"><b class="tot">' + (f && f.score !== null ? num(f.score) : '–') + '</b></td><td>' + (!c.iv ? '<span class="tag">ไม่ได้สัมภาษณ์</span>' : f.complete ? (f.pass ? '<span class="tag ok">ผ่าน</span>' : '<span class="tag bad">ไม่ผ่าน</span>') : '<span class="tag warn">รอคะแนน</span>') + '</td>' : '') + (sOn ? '<td>' + selTag(c) + '</td>' : '') +
         (hasProf ? '<td class="c">' + (c.profile && c.profile.nAtt ? '<span class="tag ' + attLevel(c.profile.att)[1] + '" title="' + attLevel(c.profile.att)[0] + '">' + num(c.profile.att, 2) + '</span>' : '–') + '</td><td class="c">' + (c.profile && c.profile.mbti ? '<span class="mbti sm" title="' + esc((MB_T[c.profile.mbti] || [''])[0]) + '">' + esc(c.profile.mbti) + '</span>' : '–') + '</td>' : '') + '<td>' + flagTags(fl.join(',')) + (bl ? '<span class="tag ' + (bl >= 3 ? 'bad' : 'warn') + '">ออกจอ ' + bl + '</span>' : '') + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   $('#tab').innerHTML = h + '</div>';
   $('#rsCsv').onclick = function () {
-    var e = d.exam, head = ['ลำดับ', 'เลขประจำตัวสอบ'].concat(d.blind ? [] : ['ชื่อ-สกุล'], ['ระบบตรวจ', 'ข้อเขียน', 'ทฤษฎีรวม', 'ปฏิบัติ', 'รวม', 'ผล'], iv ? ['เข้าสัมภาษณ์', 'สัมภาษณ์ (เต็ม ' + d.ivMax + ')', 'คะแนนรวม (เต็ม 100)', 'ลำดับคะแนนรวม', 'ผลรวม'] : [], ['บุคลิกภาพ', 'คะแนนทัศนคติ (เต็ม 4 ไม่คิดคะแนน)'], d.dims, d.items.map(function (i) { return i.label + ' (เฉลี่ย)'; }), ['จำนวนกรรมการที่ให้คะแนน', 'หมายเหตุ', 'สลับหน้าจอ (ครั้ง)']);
+    var e = d.exam, head = ['ลำดับ', 'เลขประจำตัวสอบ'].concat(d.blind ? [] : ['ชื่อ-สกุล'], ['ระบบตรวจ', 'ข้อเขียน', 'ทฤษฎีรวม', 'ปฏิบัติ', 'รวม', 'ผล'], iv ? ['เข้าสัมภาษณ์', 'สัมภาษณ์ (เต็ม ' + d.ivMax + ')', 'คะแนนรวม (เต็ม 100)', 'ลำดับคะแนนรวม', 'ผลรวม'] : [], ['ผลการคัดเลือก', 'บุคลิกภาพ', 'คะแนนทัศนคติ (เต็ม 4 ไม่คิดคะแนน)'], d.dims, d.items.map(function (i) { return i.label + ' (เฉลี่ย)'; }), ['จำนวนกรรมการที่ให้คะแนน', 'หมายเหตุ', 'สลับหน้าจอ (ครั้ง)']);
     var rows = [[e.title], [e.examDate + ' ' + e.place], ['ส่งออกเมื่อ ' + tDate(now()) + ' โดย ' + printWho() + ' · สถานะ ' + ST_TH[e.status] + ' · เกณฑ์ผ่าน ' + (iv ? 'ร้อยละ ' + e.passPct + ' ของคะแนนรวม (สอบ ' + (100 - e.ivWeight) + ' : สัมภาษณ์ ' + e.ivWeight + ')' : t.passMin + '/' + t.totalMax)], [], head];
     list.forEach(function (c) {
       var r = c.result, fl = []; Object.keys(c.secs).forEach(function (k) { String(c.secs[k].flag || '').split(',').filter(String).forEach(function (f) { fl.push(FLAG_TH[f] || f); }); });
-      rows.push([r.rank || '', c.examNo].concat(d.blind ? [] : [c.name], [r.mcq, r.essay, r.theory, r.practical, r.total, r.complete ? (r.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอตรวจ'], iv ? [c.iv ? 'ใช่' : '', c.final.iv, c.final.score, c.final.rank || '', !c.iv ? '' : c.final.complete ? (c.final.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอคะแนน'] : [], [c.profile ? c.profile.mbti : '', c.profile ? c.profile.att : ''], d.dims.map(function (x) { return c.profile ? c.profile.dims[x] : ''; }),
+      rows.push([r.rank || '', c.examNo].concat(d.blind ? [] : [c.name], [r.mcq, r.essay, r.theory, r.practical, r.total, r.complete ? (r.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอตรวจ'], iv ? [c.iv ? 'ใช่' : '', c.final.iv, c.final.score, c.final.rank || '', !c.iv ? '' : c.final.complete ? (c.final.pass ? 'ผ่าน' : 'ไม่ผ่าน') : 'รอคะแนน'] : [], [c.sel && SEL_TAG[c.sel.st] ? (c.sel.st === 'RESERVE' ? 'สำรองลำดับที่ ' + c.sel.n : c.sel.st === 'MAIN' ? 'ผู้ผ่านการคัดเลือก ลำดับ ' + c.sel.n : SEL_TAG[c.sel.st][0]) + (c.sel.tie ? ' (คะแนนเท่ากัน)' : '') : '', c.profile ? c.profile.mbti : '', c.profile ? c.profile.att : ''], d.dims.map(function (x) { return c.profile ? c.profile.dims[x] : ''; }),
         d.items.map(function (i) { return c.avg[i.item].avg; }), [Math.max.apply(null, d.items.map(function (i) { return c.avg[i.item].n; }).concat([0])), fl.join(' / '), Object.keys(c.secs).reduce(function (a, k) { return a + (c.secs[k].blur || 0); }, 0)]));
     });
     saveCsv('TalentGate_Result_' + e.examId + '.csv', rows);
@@ -573,14 +580,15 @@ function itemAnalysis(x) {
 
 /* ---------- ประกาศและอีเมล (ผู้ดูแลระบบ) ---------- */
 var MAIL_ST = { PENDING: ['รอส่ง', 'warn'], SENT: ['ส่งแล้ว', 'ok'], FAILED: ['ส่งไม่สำเร็จ', 'bad'], CANCELLED: ['ยกเลิก', ''] };
-var MAIL_VARS = ['ชื่อ', 'เลขประจำตัวสอบ', 'ตำแหน่ง', 'รอบสอบ', 'วันสอบ', 'สถานที่', 'ลิงก์ประกาศ', 'วันหมดอายุลิงก์', 'รหัสเข้าสอบ'];
+var MAIL_VARS = ['ชื่อ', 'เลขประจำตัวสอบ', 'ตำแหน่ง', 'รอบสอบ', 'วันสอบ', 'สถานที่', 'ลิงก์ประกาศ', 'วันหมดอายุลิงก์', 'รหัสเข้าสอบ', 'วันสัมภาษณ์', 'เวลาสัมภาษณ์', 'สถานที่สัมภาษณ์', 'ลิงก์ยืนยันสัมภาษณ์'];
 function tabMail() {
   var d = BD.data, e = d.exam, st = tabMail.st = tabMail.st && tabMail.st.id === BD.id ? tabMail.st : { id: BD.id, type: 'ELIGIBLE', sel: null, subject: null, body: null, share: '', when: 'now', at: '', saveTpl: false };
   if (!tabMail.r || tabMail.r.examId !== BD.id) $('#tab').innerHTML = '<div class="boot"><div class="boot-ring"></div><p>กำลังโหลด…</p></div>';
   function load() { return api('getMails', { examId: BD.id }).then(function (r) { r.examId = BD.id; tabMail.r = r; if (BD.tab === 'mail' && TG.view === 'board') { keep(); draw(); } }).catch(function (er) { toast(er.message, 'bad'); }); }
   function defSel(type) {
     var o = {};
-    d.candidates.forEach(function (c) { var oc = outcomeOf(c); if (!c.hasEmail) return; if (type === 'PASS' ? oc === 'pass' : type === 'FAIL' ? oc === 'fail' : type === 'CUSTOM' ? false : c.status === 'ACTIVE') o[c.examNo] = 1; });
+    var anyIv = d.candidates.some(function (c) { return c.iv; });
+    d.candidates.forEach(function (c) { var oc = outcomeOf(c); if (!c.hasEmail) return; if (type === 'INTERVIEW' ? (c.status === 'ACTIVE' && (anyIv ? c.iv : c.result && c.result.complete && c.result.pass)) : type === 'PASS' ? (selOn() ? c.sel && (c.sel.st === 'MAIN' || c.sel.st === 'RESERVE') : oc === 'pass') : type === 'FAIL' ? oc === 'fail' || (selOn() && c.sel && (c.sel.st === 'PASS' || c.sel.st === 'FAIL')) : type === 'CUSTOM' ? false : c.status === 'ACTIVE') o[c.examNo] = 1; });
     return o;
   }
   function keep() { if ($('#mlSub')) { st.subject = $('#mlSub').value; st.body = $('#mlBody').value; st.share = $('#mlShare').value; st.when = $('#mlWhen').value; st.at = $('#mlAt').value; st.saveTpl = $('#mlTpl').checked; } }
@@ -601,12 +609,13 @@ function tabMail() {
     // ----- เขียนอีเมล -----
     h += '<div class="card"><div class="card-head"><div><h2 class="card-t">เขียนอีเมลถึงผู้สมัคร</h2><p class="card-s">ส่งจากบัญชี Google ที่ติดตั้งระบบ ในชื่อ "' + esc(r.from || 'SOMDEJ TalentGate') + '"' + (r.reply ? ' · ตอบกลับไปที่ ' + esc(r.reply) : '') + ' · อีเมลมีหัวจดหมายโลโก้และชื่อโรงพยาบาล · โควตาวันนี้เหลือ <b>' + (r.quota === null ? 'ไม่ทราบ' : r.quota) + '</b> ฉบับ' + (noMail ? ' · <b class="bad-t">ผู้มีสิทธิ์สอบ ' + noMail + ' คนยังไม่มีอีเมล</b> (เพิ่มได้ที่แท็บผู้เข้าสอบ)' : '') + '</p></div></div>' +
       '<div class="seg wide" id="mlType">' + Object.keys(r.types).map(function (k) { return '<button data-t="' + k + '" class="' + (k === st.type ? 'on' : '') + '">' + esc(r.types[k]) + '</button>'; }).join('') + '</div>' +
+      (st.type === 'INTERVIEW' ? ivMailNote() : '') +
       '<div class="mlgrid"><div class="form"><label>หัวเรื่อง<input id="mlSub" maxlength="300" value="' + esc(st.subject) + '"></label><label>เนื้อความ<textarea id="mlBody" rows="16" maxlength="6000">' + esc(st.body) + '</textarea></label>' +
       '<div class="mlvars"><small class="muted">แทรกข้อมูลของแต่ละคน:</small>' + MAIL_VARS.map(function (v) { return '<button type="button" class="chip" data-v="' + v + '">{{' + v + '}}</button>'; }).join('') + '</div>' +
       '<label>ไฟล์ประกาศที่ใช้กับ {{ลิงก์ประกาศ}}<select id="mlShare"><option value="">— ไม่แนบลิงก์ —</option>' + open.map(function (s) { return '<option value="' + esc(s.fileId) + '"' + (s.fileId === st.share ? ' selected' : '') + '>' + esc(s.kindTh) + ': ' + esc(s.name) + ' (ถึง ' + tDate(s.until) + ')</option>'; }).join('') + '</select></label>' +
       '<div class="row2"><label>เวลาส่ง<select id="mlWhen"><option value="now"' + (st.when === 'now' ? ' selected' : '') + '>ส่งทันที</option><option value="at"' + (st.when === 'at' ? ' selected' : '') + '>ตั้งเวลาส่ง</option></select></label><label>วันและเวลาที่ส่ง<input type="datetime-local" id="mlAt" value="' + esc(st.at) + '"' + (st.when === 'at' ? '' : ' disabled') + '></label></div>' +
       (st.type === 'CUSTOM' ? '<input type="checkbox" id="mlTpl" hidden>' : '<label class="chk"><input type="checkbox" id="mlTpl"' + (st.saveTpl ? ' checked' : '') + '> บันทึกข้อความนี้เป็นแม่แบบของ "' + esc(r.types[st.type]) + '" สำหรับรอบต่อไป</label>') + (tp.custom ? '<button type="button" class="btn link" id="mlDef">ใช้แม่แบบที่บันทึกไว้อีกครั้ง</button>' : '') + '</div>' +
-      '<div><div class="gbar"><span>ผู้รับ <b id="mlN">' + nSel + '</b> คน</span><div class="acts"><button class="btn ghost-dark sm" data-g="active">ผู้มีสิทธิ์สอบทั้งหมด</button><button class="btn ghost-dark sm" data-g="pass">ผู้ผ่าน</button><button class="btn ghost-dark sm" data-g="fail">ผู้ไม่ผ่าน</button><button class="btn ghost-dark sm" data-g="none">ล้าง</button></div></div>' +
+      '<div><div class="gbar"><span>ผู้รับ <b id="mlN">' + nSel + '</b> คน</span><div class="acts"><button class="btn ghost-dark sm" data-g="active">ผู้มีสิทธิ์สอบทั้งหมด</button><button class="btn ghost-dark sm" data-g="exampass">ผ่านเกณฑ์สอบ</button>' + (d.exam.ivOn ? '<button class="btn ghost-dark sm" data-g="iv">ผู้เข้าสัมภาษณ์</button>' : '') + '<button class="btn ghost-dark sm" data-g="pass">ผู้ผ่าน</button><button class="btn ghost-dark sm" data-g="fail">ผู้ไม่ผ่าน</button><button class="btn ghost-dark sm" data-g="none">ล้าง</button></div></div>' +
       '<input id="mlQ" class="srch" placeholder="ค้นหาเลขประจำตัวสอบหรือชื่อ"><div class="tblwrap tall mlrc"><table class="tbl sm"><tbody>' + d.candidates.map(function (c) {
         var oc = outcomeOf(c), t = OUT_TH[oc];
         return '<tr data-no="' + esc(c.examNo) + '" data-o="' + oc + '" data-q="' + esc((no3(c.examNo) + ' ' + c.name).toLowerCase()) + '"><td class="c"><input type="checkbox" class="ml-c"' + (st.sel[c.examNo] ? ' checked' : '') + (c.hasEmail ? '' : ' disabled') + '></td><td>' + cLabel(c) + '</td><td>' + (c.status !== 'ACTIVE' ? '<span class="tag">' + esc(CS_TH[c.status] || c.status) + '</span>' : '<span class="tag ' + t[1] + '">' + t[0] + '</span>') + (c.hasEmail ? '' : ' <span class="tag bad">ไม่มีอีเมล</span>') + '</td></tr>';
@@ -629,7 +638,7 @@ function tabMail() {
     var r = tabMail.r;
     function count() { st.sel = {}; $$('.ml-c').forEach(function (x) { if (x.checked) st.sel[x.closest('tr').dataset.no] = 1; }); $('#mlN').textContent = Object.keys(st.sel).length; }
     $$('#mlType button').forEach(function (b) { b.onclick = function () { st.type = b.dataset.t; st.subject = null; st.body = null; st.sel = null; st.share = ''; st.saveTpl = false; draw(); }; });
-    $$('[data-g]').forEach(function (b) { b.onclick = function () { var g = b.dataset.g; $$('.ml-c').forEach(function (x) { if (x.disabled) return; var tr = x.closest('tr'), c = d.candidates.filter(function (y) { return y.examNo === tr.dataset.no; })[0]; x.checked = g === 'none' ? false : g === 'active' ? c.status === 'ACTIVE' : tr.dataset.o === g; }); count(); }; });
+    $$('[data-g]').forEach(function (b) { b.onclick = function () { var g = b.dataset.g; $$('.ml-c').forEach(function (x) { if (x.disabled) return; var tr = x.closest('tr'), c = d.candidates.filter(function (y) { return y.examNo === tr.dataset.no; })[0]; x.checked = g === 'none' ? false : g === 'active' ? c.status === 'ACTIVE' : g === 'exampass' ? c.status === 'ACTIVE' && !!(c.result && c.result.complete && c.result.pass) : g === 'iv' ? c.status === 'ACTIVE' && !!c.iv : tr.dataset.o === g; }); count(); }; });
     $$('.ml-c').forEach(function (x) { x.onchange = count; });
     $('#mlQ').oninput = function () { var q = this.value.trim().toLowerCase(); $$('.mlrc tr').forEach(function (tr) { tr.hidden = !!q && tr.dataset.q.indexOf(q) < 0; }); };
     $('#mlWhen').onchange = function () { $('#mlAt').disabled = this.value !== 'at'; };
@@ -637,7 +646,7 @@ function tabMail() {
     if ($('#mlDef')) $('#mlDef').onclick = function () { st.subject = null; st.body = null; draw(); };
     $('#mlPrev').onclick = function () {
       var b = this; keep(); busy(b, true, 'กำลังเตรียม…');
-      api('getMails', { examId: BD.id, preview: { body: st.body, share: st.share } }).then(function (x) { busy(b, false); modal('<h2>ตัวอย่างอีเมล</h2><p class="muted sm">หัวเรื่อง: <b>' + esc(st.subject.replace(/\{\{\s*ตำแหน่ง\s*\}\}/g, e.posName)) + '</b> · ข้อมูลในตัวอย่างเป็นผู้สมัครสมมติ · โลโก้จะแสดงในอีเมลจริง</p><div class="mailprev">' + x.preview + '</div>', { cls: 'lg' }); }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); });
+      api('getMails', { examId: BD.id, apiUrl: typeof API_URL !== 'undefined' ? API_URL : '', preview: { type: st.type, body: st.body, share: st.share } }).then(function (x) { busy(b, false); modal('<h2>ตัวอย่างอีเมล</h2><p class="muted sm">หัวเรื่อง: <b>' + esc(st.subject.replace(/\{\{\s*ตำแหน่ง\s*\}\}/g, e.posName)) + '</b> · ข้อมูลในตัวอย่างเป็นผู้สมัครสมมติ (เลขที่ 001 เวลา 09.00 น.)</p><div class="mailprev">' + String(x.preview).replace(/cid:logo/g, esc(logoSrc())) + '</div>', { cls: 'lg' }); }).catch(function (er) { busy(b, false); toast(er.message, 'bad'); });
     };
     $('#mlSend').onclick = function () {
       keep(); count();
@@ -649,7 +658,7 @@ function tabMail() {
       askPass('ยืนยันการส่งอีเมล', '<p><b>' + esc(r.types[st.type]) + '</b> ถึงผู้สมัคร <b>' + nos.length + ' คน</b> · ' + (at ? 'ตั้งเวลาส่ง ' + tLong(at) : 'ส่งทันที') + '</p>' + (code ? '<div class="note warn">เนื้อความมี <b>รหัสเข้าสอบ</b> ของผู้สมัคร — ตรวจให้แน่ใจว่าอีเมลของแต่ละคนถูกต้อง</div>' : '') + (over ? '<div class="note warn">โควตาอีเมลวันนี้เหลือ ' + r.quota + ' ฉบับ ส่วนที่เกินจะรอส่งเมื่อโควตากลับมา (รอบถัดไปของวันพรุ่งนี้)</div>' : '') + '<p class="muted">อีเมลที่ส่งแล้วเรียกคืนไม่ได้ · ระบบบันทึกผู้ส่งและเวลาไว้ในประวัติ</p>', at ? 'ตั้งเวลาส่ง' : 'ส่งอีเมล').then(function (p) {
         if (!p) return;
         var b = $('#mlSend'); busy(b, true, 'กำลังส่ง…');
-        api('queueMails', { examId: BD.id, type: st.type, examNos: nos, subject: st.subject, body: st.body, share: st.share, sendAt: at, saveTpl: st.saveTpl, password: p.password }, { timeout: 240000 }).then(function (x) {
+        api('queueMails', { examId: BD.id, apiUrl: typeof API_URL !== 'undefined' ? API_URL : '', type: st.type, examNos: nos, subject: st.subject, body: st.body, share: st.share, sendAt: at, saveTpl: st.saveTpl, password: p.password }, { timeout: 240000 }).then(function (x) {
           toast(x.scheduled ? 'ตั้งเวลาส่งแล้ว ' + x.queued + ' ฉบับ' : 'ส่งแล้ว ' + x.sent + ' ฉบับ' + (x.failed ? ' · ไม่สำเร็จ ' + x.failed : '') + (x.left ? ' · รอส่งต่ออัตโนมัติ ' + x.left : ''), x.failed ? 'bad' : 'ok', 8000);
           if (x.noEmail && x.noEmail.length) toast('ข้าม ' + x.noEmail.length + ' คนที่ไม่มีอีเมล', 'warn');
           st.sel = null; st.saveTpl = false; load();

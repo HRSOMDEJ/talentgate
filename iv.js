@@ -260,8 +260,8 @@ function tabInterview() {
     h += '<details class="card ivpick"' + (list.length ? '' : ' open') + '><summary><b>เลือกผู้เข้าสัมภาษณ์</b><span class="muted sm">เลือกแล้ว ' + list.length + ' จากผู้มีสิทธิ์สอบ ' + act.length + ' คน · คลิกเพื่อเปิด/ปิด</span></summary>' +
       (anySigned ? '<div class="note warn">มีกรรมการยืนยันคะแนนสัมภาษณ์แล้ว จึงเปลี่ยนรายชื่อไม่ได้ (ปลดล็อกการยืนยันที่แท็บ "รายงาน" ก่อน)</div>' : '') +
       '<div class="acts ivpick-a"><button class="btn ghost-dark sm" data-pick="all">เลือกทุกคนที่เข้าสอบ</button><button class="btn ghost-dark sm" data-pick="pass">เลือกเฉพาะผู้ผ่านเกณฑ์สอบ</button><button class="btn ghost-dark sm" data-pick="none">ล้างการเลือก</button></div>' +
-      '<div class="tblwrap"><table class="tbl sm"><thead><tr><th class="c">สัมภาษณ์</th><th>ผู้เข้าสอบ</th><th class="r">คะแนนสอบ<small>/' + d.totals.totalMax + '</small></th><th>ผลสอบ</th><th class="c">เอกสาร</th></tr></thead><tbody>' +
-      act.map(function (c) { var r = c.result; return '<tr data-no="' + esc(c.examNo) + '"><td class="c"><input type="checkbox" class="ivp"' + (c.iv ? ' checked' : '') + (anySigned || ro ? ' disabled' : '') + ' data-started="' + (r.started ? 1 : 0) + '" data-pass="' + (r.pass ? 1 : 0) + '"></td><td>' + cLabel(c) + '</td><td class="r">' + (r.started ? num(r.total) : '–') + '</td><td>' + (r.started ? (r.complete ? (r.pass ? '<span class="tag ok">ผ่านเกณฑ์สอบ</span>' : '<span class="tag bad">ไม่ผ่านเกณฑ์สอบ</span>') : '<span class="tag warn">รอตรวจ</span>') : '<span class="tag">ไม่ได้เข้าสอบ</span>') + '</td><td class="c"><button class="btn link ivp-doc">' + (c.nDocs ? c.nDocs + ' ไฟล์' : 'เพิ่มเอกสาร') + '</button></td></tr>'; }).join('') +
+      '<div class="tblwrap"><table class="tbl sm"><thead><tr><th class="c">สัมภาษณ์</th><th>ผู้เข้าสอบ</th><th class="r">คะแนนสอบ<small>/' + d.totals.totalMax + '</small></th><th>ผลสอบ</th><th>ตอบรับอีเมล</th><th class="c">เอกสาร</th></tr></thead><tbody>' +
+      act.map(function (c) { var r = c.result; return '<tr data-no="' + esc(c.examNo) + '"><td class="c"><input type="checkbox" class="ivp"' + (c.iv ? ' checked' : '') + (anySigned || ro ? ' disabled' : '') + ' data-started="' + (r.started ? 1 : 0) + '" data-pass="' + (r.pass ? 1 : 0) + '"></td><td>' + cLabel(c) + '</td><td class="r">' + (r.started ? num(r.total) : '–') + '</td><td>' + (r.started ? (r.complete ? (r.pass ? '<span class="tag ok">ผ่านเกณฑ์สอบ</span>' : '<span class="tag bad">ไม่ผ่านเกณฑ์สอบ</span>') : '<span class="tag warn">รอตรวจ</span>') : '<span class="tag">ไม่ได้เข้าสอบ</span>') + '</td><td>' + ivConfTag(c) + '</td><td class="c"><button class="btn link ivp-doc">' + (c.nDocs ? c.nDocs + ' ไฟล์' : 'เพิ่มเอกสาร') + '</button></td></tr>'; }).join('') +
       '</tbody></table></div>' + (anySigned || ro ? '' : '<div class="acts ivpick-a"><button class="btn primary" id="ivpSave">บันทึกรายชื่อผู้เข้าสัมภาษณ์</button><span class="muted sm" id="ivpN"></span></div>') + '</details>';
   }
   h += '<div class="blindbar ivbar"><span><b>คะแนนรวม</b> = คะแนนสอบ ' + (100 - e.ivWeight) + '% + สัมภาษณ์ ' + e.ivWeight + '% <small class="muted">· เกณฑ์ผ่านร้อยละ ' + e.passPct + ' ของคะแนนรวม · สัมภาษณ์เต็ม ' + d.ivMax + ' คะแนน (' + items.length + ' หัวข้อ)</small></span></div>';
@@ -351,15 +351,22 @@ function tabReports() {
       rp('คะแนนรวม แยกรายกรรมการ', 'A4 แนวนอน · ผลรวมที่กรรมการแต่ละท่านให้ในแต่ละส่วน เทียบกับค่าเฉลี่ยที่ใช้คิดผล', pb('BYG')));
     h += grp(4, 'สรุปผลผู้เข้าสอบ', 'ผลของผู้เข้าสอบทุกคน และใบสรุปรายบุคคล',
       rp('สรุปผลการสอบคัดเลือก', 'A4 แนวนอน · ทุกส่วนของทุกคน เรียงตามลำดับคะแนนรวม', pb('SUM')) +
+      rp('รายงานผลสอบรายข้อ (รายบุคคล)', 'A4 แนวตั้ง · ทุกข้อ: ตอบอะไร เฉลยอะไร ถูก/ผิด ได้กี่คะแนน · เก็บเป็นประวัติรายคน — ดูบนจอได้ที่แท็บ "ผลรายบุคคล"', '<select id="rpCR"><option value="">ทุกคนที่เข้าสอบ</option>' + activeCands().filter(function (c) { return c.result.started; }).map(function (c) { return '<option value="' + esc(c.examNo) + '">' + esc(no3(c.examNo)) + ' ' + esc(ivName(c)) + '</option>'; }).join('') + '</select><button class="btn primary sm" id="rpCRb">' + ICON.print + 'ดูตัวอย่าง / พิมพ์</button>') +
       rp('ใบสรุปผลรายบุคคล', 'A4 แนวตั้ง · 1 คนต่อ 1 หน้า: คะแนนทุกส่วน คะแนนรายกรรมการ บันทึกของกรรมการ', '<select id="rpC"><option value="ALL">' + (e.ivOn ? 'ทุกคนที่เข้าสัมภาษณ์' : 'ทุกคนที่เข้าสอบ') + '</option>' + (e.ivOn ? '<option value="STARTED">ทุกคนที่เข้าสอบ</option>' : '') +
         activeCands().filter(function (c) { return c.result.started || c.iv; }).map(function (c) { return '<option value="' + esc(c.examNo) + '">' + esc(no3(c.examNo)) + ' ' + esc(ivName(c)) + '</option>'; }).join('') + '</select>' + pb('IND')));
     h += grp(5, 'ประกาศผล', 'ประกาศผลการสอบคัดเลือกตามแบบประกาศของโรงพยาบาล — พิมพ์ ลงนาม/ประทับตรา แล้วนำไฟล์ไปแนบที่แท็บ "ประกาศและอีเมล"',
       rp('ประกาศผลการสอบคัดเลือก', 'A4 แนวตั้ง · รายชื่อผู้ผ่านการคัดเลือกเรียงตามลำดับคะแนน (ไม่แสดงคะแนน) · กำหนดจำนวนตัวจริง/สำรองได้', (d.isAdmin ? '<button class="btn ghost-dark sm" data-ann="res">' + ICON.edit + 'แก้ไขข้อความประกาศ</button>' : '') + pb('RES')));
+    if (d.isAdmin) h += grp(6, 'ข้อสอบฉบับพิมพ์ (กระดาษ)', 'ข้อสอบทุกตอนของรอบนี้ตามที่ตั้งค่าไว้ — ใช้สอบในกระดาษกรณีระบบขัดข้อง หรือเก็บเป็นหลักฐาน',
+      rp('ข้อสอบ (ไม่มีเฉลย)', 'A4 แนวตั้ง · มีช่องเลขประจำตัวสอบ/ชื่อ · ปรนัยมีวงกลมให้ฝน · ข้อเขียนมีบรรทัดให้เขียน', '<button class="btn primary sm" id="rpPP">' + ICON.print + 'ดูตัวอย่าง / พิมพ์</button>') +
+      rp('ข้อสอบพร้อมเฉลย (เอกสารลับ)', 'A4 แนวตั้ง · เฉลยทุกข้อ + เกณฑ์ให้คะแนนข้อเขียน/ภาคปฏิบัติ · ต้องยืนยันรหัสผ่าน และระบบบันทึกผู้พิมพ์', '<button class="btn ghost-dark sm" id="rpPK">' + ICON.lock + 'พิมพ์ฉบับมีเฉลย</button>'));
     h += '<div class="card"><div class="card-head"><div><h2 class="card-t">คะแนนรวมและคะแนนรายกรรมการ</h2><p class="card-s">คะแนนที่กรรมการแต่ละท่านให้ (ผลรวมทุกหัวข้อตามหน้าที่ของท่านนั้น) และค่าเฉลี่ยที่ระบบใช้คิดผล · * = ให้คะแนนยังไม่ครบ</p></div></div>' + matrixHtml(false) + '</div>';
   }
   h += '<div class="card"><div class="card-head"><div><h2 class="card-t">ตรวจสอบรหัสเอกสาร</h2><p class="card-s">กรอกรหัสที่ท้ายกระดาษ ระบบจะแจ้งว่าเอกสารออกจากระบบจริงหรือไม่ ใครพิมพ์ เมื่อใด และคะแนนในระบบยังตรงกับตอนพิมพ์หรือไม่</p></div><form class="inrow" id="vfF"><input id="vfC" placeholder="เช่น TG691005-AB12CD" maxlength="20" autocomplete="off" required><button class="btn ghost-dark sm" id="vfB">ตรวจสอบ</button></form></div><div id="vfR"></div><div id="rpHist"><p class="muted sm">กำลังโหลดประวัติการพิมพ์…</p></div></div>';
   keepScroll(function () { $('#tab').innerHTML = h; });
   bindSign($('#tab'), function () { if (BD.tab === 'reports') tabReports(); });
+  if ($('#rpCRb')) $('#rpCRb').onclick = function () { printCandReport($('#rpCR').value, this); };
+  if ($('#rpPP')) $('#rpPP').onclick = function () { printPaper(false, this); };
+  if ($('#rpPK')) $('#rpPK').onclick = function () { printPaper(true, this); };
   $$('[data-rp]').forEach(function (b) {
     b.onclick = function () {
       var t = b.dataset.rp, v;
@@ -584,11 +591,13 @@ function annDefaults(kind) {
 function annMeta(kind) { var m = (BD.data.meta || {})[kind] || {}, df = annDefaults(kind), o = {}; Object.keys(df).forEach(function (k) { o[k] = m[k] !== undefined ? m[k] : df[k]; }); o.saved = m.subject !== undefined; return o; }
 function annList(kind, m) {
   if (kind === 'ann') return activeCands().slice().sort(byNo);
+  if (selOn()) return activeCands().filter(function (c) { return c.sel && (c.sel.st === 'MAIN' || c.sel.st === 'RESERVE'); }).sort(function (a, b) { return (a.sel.st === b.sel.st ? 0 : a.sel.st === 'MAIN' ? -1 : 1) || a.sel.n - b.sel.n; });
   var iv = BD.data.exam.ivOn;
   return activeCands().filter(function (c) { return outcomeOf(c) === 'pass'; }).sort(function (a, b) { return iv ? ((a.final.rank || 9999) - (b.final.rank || 9999)) || byNo(a, b) : ((a.result.rank || 9999) - (b.result.rank || 9999)) || byNo(a, b); });
 }
 function docAnnounce(kind, m) {
-  var o = hosp(), list = annList(kind, m), res = kind === 'res', nMain = res ? Math.floor(Number(m.reserve)) || 0 : 0, d = BD.data;
+  var o = hosp(), list = annList(kind, m), res = kind === 'res', d = BD.data, nMain = res ? (selOn() ? list.filter(function (c) { return c.sel.st === 'MAIN'; }).length : Math.floor(Number(m.reserve)) || 0) : 0;
+  if (res && selOn() && nMain === list.length) nMain = 0;   // ไม่มีตัวสำรอง → ไม่ต้องมีช่องหมายเหตุ
   var wait = res && activeCands().some(function (c) { return outcomeOf(c) === 'wait'; });
   var rows = list.map(function (c, i) {
     var n = splitName(ivName(c));
@@ -608,7 +617,7 @@ function annEdit(kind) {
     '<form class="form" id="anF"><div class="row2"><label>เลขที่ประกาศ (กรอกเอง)<input id="anNo" maxlength="60" placeholder="เช่น 1782 / ' + thYear() + '" value="' + esc(m.no) + '"></label><label>ประกาศ ณ วันที่<input id="anDate" maxlength="60" value="' + esc(m.date) + '"></label></div>' +
     '<label>เรื่อง<textarea id="anSub" rows="2" maxlength="300">' + esc(m.subject) + '</textarea></label><label>เนื้อความก่อนรายชื่อ<textarea id="anIntro" rows="5" maxlength="3000">' + esc(m.intro) + '</textarea></label>' +
     '<label>หมายเหตุท้ายรายชื่อ (ขึ้นบรรทัดใหม่ = ข้อใหม่)<textarea id="anNotes" rows="5" maxlength="3000">' + esc(m.notes) + '</textarea></label>' +
-    (res ? '<label>จำนวนผู้ผ่านการคัดเลือก (ตัวจริง) — ผู้ผ่านเกณฑ์ลำดับถัดไปจะขึ้นเป็น "สำรอง" · เว้นว่าง = ไม่แยกตัวจริง/สำรอง<input id="anRes" type="number" min="0" max="500" value="' + esc(m.reserve || '') + '"></label>' : '') +
+    (res ? (selOn() ? '<div class="note info">รายชื่อในประกาศใช้<b>ผลการคัดเลือก</b>ตามที่ตั้งไว้ในแท็บตั้งค่ารอบสอบ: ตัวจริง ' + BD.data.cfg.seats + ' อัตรา · สำรอง ' + BD.data.cfg.reserves + ' ลำดับ</div><input id="anRes" type="hidden" value="' + esc(m.reserve || '') + '">' : '<label>จำนวนผู้ผ่านการคัดเลือก (ตัวจริง) — ผู้ผ่านเกณฑ์ลำดับถัดไปจะขึ้นเป็น "สำรอง" · เว้นว่าง = ไม่แยกตัวจริง/สำรอง (แนะนำ: ตั้ง "จำนวนที่รับ/สำรอง" ที่แท็บตั้งค่ารอบสอบแทน)<input id="anRes" type="number" min="0" max="500" value="' + esc(m.reserve || '') + '"></label>') : '') +
     '<div class="modal-act"><button type="button" class="btn link" id="anDef">คืนค่าข้อความตั้งต้น</button><span class="sp"></span><button type="button" class="btn ghost-dark" id="anX">ยกเลิก</button><button class="btn primary" id="anS">บันทึก</button></div></form>', { cls: 'lg' });
   $('#anX', b).onclick = closeModal;
   $('#anDef', b).onclick = function () { var df = annDefaults(kind); $('#anSub', b).value = df.subject; $('#anIntro', b).value = df.intro; $('#anNotes', b).value = df.notes; $('#anDate', b).value = df.date; };

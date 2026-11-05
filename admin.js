@@ -115,7 +115,8 @@ function tabSetup() {
         }).catch(function (e) { busy(bt, false); toast(e.message, 'bad', 9000); });
       };
     }
-    function secMax(s) { return s.type === 'PROFILE' ? 0 : s.type === 'PRACTICAL' ? (s.rubric || []).reduce(function (a, r) { return a + (Number(r.max) || 0); }, 0) : s.sets.reduce(function (a, id) { var x = d.sets.filter(function (q) { return q.setId === id; })[0]; return a + (x ? x.pts : 0); }, 0); }
+    ex.cfg = ex.cfg || { seats: 0, reserves: 0, showScore: false, ivs: {} }; ex.cfg.ivs = ex.cfg.ivs || {};
+    function secMax(s) { if (s.type === 'THEORY' && s.qids && s.qids.length) return s._pts !== undefined ? s._pts : (s.maxScore || 0); return s.type === 'PROFILE' ? 0 : s.type === 'PRACTICAL' ? (s.rubric || []).reduce(function (a, r) { return a + (Number(r.max) || 0); }, 0) : s.sets.reduce(function (a, id) { var x = d.sets.filter(function (q) { return q.setId === id; })[0]; return a + (x ? x.pts : 0); }, 0); }
     function draw() {
       var total = secs.reduce(function (a, s) { return a + secMax(s); }, 0), mins = secs.reduce(function (a, s) { return a + (Number(s.minutes) || 0); }, 0);
       var h = (lock ? '<div class="note warn">มีผู้เข้าสอบเริ่มทำข้อสอบแล้ว จึงเปลี่ยนประเภทตอน ชุดข้อสอบ หรือเพิ่ม/ลบตอนไม่ได้ (แก้ชื่อ เวลา คำชี้แจง เกณฑ์ และกรรมการได้)</div>' : '') + (ro ? '<div class="note warn">รอบสอบนี้ยืนยันผลแล้ว แก้ไขไม่ได้</div>' : '') +
@@ -128,13 +129,14 @@ function tabSetup() {
           '<div class="se-l">หัวข้อให้คะแนนสัมภาษณ์ — รวม ' + ex.ivItems.reduce(function (a, x) { return a + (Number(x.max) || 0); }, 0) + ' คะแนน' + (ex.ivLocked ? ' <span class="tag warn">มีคะแนนแล้ว: แก้ได้เฉพาะชื่อหัวข้อ</span>' : '') + '</div><table class="tbl rub-e ivi-e"><thead><tr><th>หัวข้อ</th><th class="r">คะแนนเต็ม</th><th></th></tr></thead><tbody>' +
           ex.ivItems.map(function (x, j) { return '<tr data-j="' + j + '"><td><input data-iv="label" maxlength="80" value="' + esc(x.label) + '"' + (ro ? ' disabled' : '') + '></td><td class="r"><input data-iv="max" type="number" min="1" max="100" step="1" value="' + x.max + '"' + (ro || ex.ivLocked ? ' disabled' : '') + '></td><td>' + (ro || ex.ivLocked ? '' : '<button class="icon-btn dark" data-ivr="' + j + '" title="ลบหัวข้อ">×</button>') + '</td></tr>'; }).join('') +
           '</tbody></table>' + (ro || ex.ivLocked ? '' : '<button class="btn link" id="sxIvA">' + ICON.plus + 'เพิ่มหัวข้อ</button>') + '</div>' : '<p class="muted sm">รอบนี้ไม่ใช้การสัมภาษณ์ในระบบ: ผลสอบคิดจากคะแนนสอบอย่างเดียว</p>') + '</div>' +
+        cfgCard(ex, ro) +
         '<div class="card-head"><h2 class="sec-h">ตอนสอบ <small class="muted">รวม ' + mins + ' นาที · ' + total + ' คะแนน</small></h2>' + (ro || lock ? '' : '<button class="btn ghost-dark sm" id="sxAdd">' + ICON.plus + 'เพิ่มตอน</button>') + '</div>';
       secs.forEach(function (s, i) {
         h += '<div class="card secedit" data-i="' + i + '"><div class="se-h"><span class="se-n">' + (i + 1) + '</span><input class="se-t" data-f="title" maxlength="160" value="' + esc(s.title) + '" placeholder="ชื่อตอน">' +
           '<select data-f="type"' + (lock && s.secId || ro ? ' disabled' : '') + '>' + ['PROFILE', 'THEORY', 'PRACTICAL'].map(function (t) { return '<option value="' + t + '"' + (s.type === t ? ' selected' : '') + '>' + TYPE_TH[t] + '</option>'; }).join('') + '</select>' +
           '<label class="se-m"><input type="number" data-f="minutes" min="1" max="300" value="' + s.minutes + '"> นาที</label><span class="se-x"><button class="icon-btn dark" data-mv="-1" title="เลื่อนขึ้น"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="icon-btn dark" data-mv="1" title="เลื่อนลง"' + (i === secs.length - 1 ? ' disabled' : '') + '>↓</button>' +
           (lock || ro ? '' : '<button class="icon-btn dark" data-rm="1" title="ลบตอน">×</button>') + '</span></div><label class="se-l">คำชี้แจงที่ผู้เข้าสอบเห็น<textarea data-f="instructions" rows="2" maxlength="4000">' + esc(s.instructions) + '</textarea></label>';
-        if (s.type !== 'PRACTICAL') h += '<div class="se-l">ชุดข้อสอบที่ใช้ในตอนนี้</div>' + setChips(s, i) + (s.type === 'THEORY' ? '<label class="chk"><input type="checkbox" data-f="shuffle"' + (s.shuffle ? ' checked' : '') + '> สลับลำดับข้อปรนัยไม่เหมือนกันในแต่ละคน (ข้อถูก/ผิด จับคู่ เรียงลำดับ เติมคำ อยู่ต้นตอน · ข้อที่กรรมการตรวจอยู่ท้ายเสมอ)</label><p class="muted sm">คะแนนเต็มของตอนนี้ = ' + secMax(s) + ' (รวมจากข้อสอบในชุดที่เลือก)</p>' : '<p class="muted sm">ตอนนี้ไม่คิดคะแนน ใช้เป็นข้อมูลประกอบการสัมภาษณ์</p>');
+        if (s.type !== 'PRACTICAL') h += '<div class="se-l">ชุดข้อสอบที่ใช้ในตอนนี้</div>' + secPickBox(s, i, ro || (lock && s.secId)) + setChips(s, i) + (s.type === 'THEORY' ? '<label class="chk"><input type="checkbox" data-f="shuffle"' + (s.shuffle ? ' checked' : '') + '> สลับลำดับข้อปรนัยไม่เหมือนกันในแต่ละคน (ข้อถูก/ผิด จับคู่ เรียงลำดับ เติมคำ อยู่ต้นตอน · ข้อที่กรรมการตรวจอยู่ท้ายเสมอ)</label><p class="muted sm">คะแนนเต็มของตอนนี้ = ' + secMax(s) + ' (รวมจากข้อสอบในชุดที่เลือก)</p>' : '<p class="muted sm">ตอนนี้ไม่คิดคะแนน ใช้เป็นข้อมูลประกอบการสัมภาษณ์</p>');
         else h += '<div class="se-l">ไฟล์โจทย์ (.xlsx)</div><div class="tplrow">' + ICON.file + '<span>' + (s.hasTemplate ? esc(s.tplName) : '<b class="bad-t">ยังไม่มีไฟล์โจทย์</b>') + '</span>' + (s.secId ? (ro ? '' : '<label class="btn ghost-dark sm">อัปโหลดไฟล์โจทย์' + (s.hasTemplate ? 'ใหม่' : '') + '<input type="file" accept=".xlsx" hidden data-tpl="' + esc(s.secId) + '"></label>') : '<small class="muted">บันทึกการตั้งค่าก่อน จึงอัปโหลดไฟล์ได้</small>') + '</div>' +
           '<div class="se-l">เกณฑ์ให้คะแนน (กรรมการให้คะแนนตามหัวข้อเหล่านี้) — รวม ' + secMax(s) + ' คะแนน</div><table class="tbl rub-e"><thead><tr><th>หัวข้อ</th><th class="r">คะแนนเต็ม</th><th>แนวทางให้คะแนน</th><th></th></tr></thead><tbody>' +
           (s.rubric || []).map(function (r, j) { return '<tr data-j="' + j + '"><td><input data-r="label" maxlength="120" value="' + esc(r.label) + '"></td><td class="r"><input data-r="max" type="number" min="0" max="100" step="0.5" value="' + r.max + '"></td><td><textarea data-r="guide" rows="2" maxlength="1500">' + esc(r.guide || '') + '</textarea></td><td>' + (ro ? '' : '<button class="icon-btn dark" data-rr="' + j + '" title="ลบหัวข้อ">×</button>') + '</td></tr>'; }).join('') +
@@ -154,6 +156,7 @@ function tabSetup() {
       ex.title = val('sxT'); ex.posId = val('sxPos'); ex.passPct = Number(val('sxPass')); ex.examDate = val('sxD'); ex.place = val('sxP'); ex.note = val('sxN'); ex.blind = $('#sxBlind').checked;
       $$('tr[data-cm]').forEach(function (tr) { ex.duties[tr.dataset.cm] = $$('.cm-d', tr).filter(function (x) { return x.checked; }).map(function (x) { return x.value; }); });
       if ($('#sxIv')) ex.ivOn = $('#sxIv').checked;
+      cfgPull(ex);
       if ($('#sxIvW')) ex.ivWeight = Math.max(0, Math.min(100, Number(val('sxIvW')) || 0));
       $$('.ivi-e tbody tr').forEach(function (tr) { var x = ex.ivItems[+tr.dataset.j]; $$('[data-iv]', tr).forEach(function (el) { x[el.dataset.iv] = el.dataset.iv === 'max' ? Number(el.value) : el.value; }); });
     }
@@ -163,8 +166,9 @@ function tabSetup() {
         $$('[data-mv]', card).forEach(function (b) { b.onclick = function () { pull(); var j = i + Number(b.dataset.mv), t = secs[i]; secs[i] = secs[j]; secs[j] = t; draw(); }; });
         var rm = $('[data-rm]', card); if (rm) rm.onclick = function () { pull(); secs.splice(i, 1); draw(); };
         var ty = $('[data-f=type]', card); ty.onchange = function () { pull(); s.sets = []; if (s.type === 'PRACTICAL' && !(s.rubric || []).length) s.rubric = [{ label: 'งานที่ 1', max: 10, guide: '' }]; draw(); };
-        $$('[data-set]', card).forEach(function (x) { x.onchange = function () { pull(); draw(); }; });
-        $$('[data-unset]', card).forEach(function (x) { x.onclick = function () { pull(); s.sets = s.sets.filter(function (id) { return id !== x.dataset.unset; }); draw(); }; });
+        $$('[data-set]', card).forEach(function (x) { x.onchange = function () { pull(); pickTrim(s); draw(); }; });
+        $$('[data-unset]', card).forEach(function (x) { x.onclick = function () { pull(); s.sets = s.sets.filter(function (id) { return id !== x.dataset.unset; }); pickTrim(s); draw(); }; });
+        $$('[data-pick]', card).forEach(function (b) { b.onclick = function () { pull(); if (b.dataset.pick === 'all') { s.qids = []; delete s._pts; toast('ใช้ทุกข้อที่เปิดใช้ในชุดที่เลือก', 'ok'); return draw(); } pickModal(s, function () { draw(); }); }; });
         var sq = $('[data-sq]', card); if (sq) { sq.oninput = function () { setFilter(card); }; setFilter(card); }
         $$('[data-rr]', card).forEach(function (b) { b.onclick = function () { pull(); s.rubric.splice(+b.dataset.rr, 1); draw(); }; });
         var ra = $('[data-ra]', card); if (ra) ra.onclick = function () { pull(); (s.rubric = s.rubric || []).push({ label: '', max: 5, guide: '' }); draw(); };
