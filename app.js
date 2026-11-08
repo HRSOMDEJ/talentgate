@@ -2,7 +2,7 @@
    SOMDEJ TalentGate · app.js — แกนกลาง · เข้าสู่ระบบ · ตัวช่วยที่ใช้ร่วมกัน
    BUILD ต้องตรงกัน 3 ที่: Config.gs · app.js (TG_BUILD) · version.json (+ ?v= ใน index.html)
    ===================================================================== */
-var TG_BUILD = '2569-11-06.1';
+var TG_BUILD = '2569-11-08.1';
 var TG = { boot: null, token: null, kind: null, me: null, home: null, state: null, offset: 0, view: null };
 
 /* ---------- ตัวช่วยทั่วไป ---------- */
@@ -292,6 +292,7 @@ function topRight() {
     if (!TG.me.mustChange) {
       h += '<nav class="nav" aria-label="เมนูหลัก" data-hs="hs-nav"><a href="#/staff" data-nav="staff">' + TI.exams + '<span>รอบสอบ</span></a>';
       if (isAdmin() || isAuthor()) h += '<a href="#/admin/bank" data-nav="bank">' + TI.bank + '<span>คลังข้อสอบ</span></a>';
+      if (isAdmin() || isHr()) h += '<a href="#/registry" data-nav="registry">' + (TI.registry || TI.cands) + '<span>ทะเบียนผู้สมัคร</span></a>';   // รุ่น 2.2
       if (isAdmin()) h += '<a href="#/admin/positions" data-nav="positions">' + TI.pos + '<span>ตำแหน่ง</span></a><a href="#/admin/staff" data-nav="people">' + TI.cands + '<span>เจ้าหน้าที่</span></a><a href="#/admin/settings" data-nav="settings">' + TI.setup + '<span>ตั้งค่า</span></a>';
       h += '</nav>';
     }
@@ -306,7 +307,7 @@ function topRight() {
   markNav(); hscroll($('.nav', el));
 }
 function markNav() {
-  var p = location.hash.replace(/^#\/?/, '').split('/'), key = p[0] === 'admin' ? ({ staff: 'people' }[p[1]] || p[1]) : 'staff';
+  var p = location.hash.replace(/^#\/?/, '').split('/'), key = p[0] === 'admin' ? ({ staff: 'people' }[p[1]] || p[1]) : p[0] === 'registry' ? 'registry' : 'staff';
   $$('.nav a').forEach(function (a) { a.classList.toggle('active', a.dataset.nav === key); });
 }
 function logout() {
@@ -407,6 +408,7 @@ function route() {
   document.body.className = 'pg-staff'; topRight();
   if (parts[0] === 'admin' && (isAdmin() || (isAuthor() && parts[1] === 'bank'))) return adminRoute(parts.slice(1));
   if (parts[0] === 'staff' && parts[1]) return boardRoute(parts[1], parts[2] || 'overview');
+  if (parts[0] === 'registry' && (isAdmin() || isHr()) && typeof viewRegistry === 'function') return viewRegistry();   // รุ่น 2.2
   return viewStaffHome();
 }
 window.addEventListener('hashchange', route);
